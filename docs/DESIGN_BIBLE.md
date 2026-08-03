@@ -1,0 +1,44 @@
+# Backyard Realms Design Bible
+
+## Core premise
+A child aged roughly 10–12 turns a familiar backyard into changing adventure worlds through imaginative play. Each friend contributes a different interpretation, changing enemies, NPC roles, atmosphere, and rules while preserving recognizable physical landmarks.
+
+## Emotional rule
+The game never mocks imagination or treats it as something the children must abandon. The imagined adventures are emotionally real, and ambiguity about whether something magical truly happened should remain.
+
+## Engine philosophy
+- Build a reusable Android-first engine for top-down 2D action-adventure games.
+- Build only what a playable requirement needs.
+- Keep engine systems independent of Backyard Realms characters and lore.
+- Keep the game playable after every milestone.
+- Generalize only after repeated real use cases.
+
+## World rules
+- The physical backyard is the authoritative spatial layer.
+- Imagination themes reinterpret landmarks and content rather than replacing the map arbitrarily.
+- Player and camera position persist through theme changes.
+- Friends influence genre, visual language, enemies, and NPC identities.
+
+## Current technical decisions
+- Native Android/Kotlin.
+- SurfaceView rendering with fixed 60 Hz updates.
+- Logical resolution: 480 × 270.
+- Current test world: 960 × 540.
+- Touch-first input with reusable abstract actions.
+- SharedPreferences save backend during early development.
+- Placeholder geometric art is acceptable until systems stabilize.
+
+## Naming conventions
+- Engine packages describe mechanisms: `engine.events`, `engine.entity`, `engine.save`.
+- Game packages describe meaning: `game.theme`, `game.world`, `game.ambient`.
+- Stable world objects receive durable lowercase IDs such as `fort`, `tree`, and `sandbox`.
+
+## Milestone status
+- 0.1: game loop, touch movement, collision, stick action.
+- 0.2: scrolling world, camera, animation framework, interaction, Mia.
+- 0.3: imagination switching, themed landmarks, developer panel.
+- 0.4: living-world entity groundwork, behaviors, ambience, events, time, save, audio routing.
+
+## Near-term roadmap
+- 0.5: combat foundation—health, damage, knockback, hit reactions, enemy state machine.
+- Then begin Chapter 1 development with an actual playable progression.

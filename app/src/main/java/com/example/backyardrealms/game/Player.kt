@@ -28,6 +28,9 @@ class Player(
 
     val centerX: Float get() = body.centerX()
     val centerY: Float get() = body.centerY()
+    val x: Float get() = body.left
+    val y: Float get() = body.top
+    fun setPosition(x: Float, y: Float) { body.offsetTo(x, y); velocityX = 0f; velocityY = 0f }
     val collisionBounds: RectF get() = RectF(body)
     val isAttacking: Boolean get() = actionTimer > 0f
 
