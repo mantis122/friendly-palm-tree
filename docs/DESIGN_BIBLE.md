@@ -42,3 +42,9 @@ The game never mocks imagination or treats it as something the children must aba
 ## Near-term roadmap
 - 0.5: combat foundation—health, damage, knockback, hit reactions, enemy state machine.
 - Then begin Chapter 1 development with an actual playable progression.
+
+## Combat foundation
+
+Combat exists inside imagined play first; the ordinary backyard is safe. Engine combat is expressed through reusable health, damage, hitbox, hurtbox, knockback, invulnerability, and defeat concepts. Game-specific weapons and creatures configure those mechanisms rather than replacing them.
+
+Combat must remain forgiving on touch screens: generous attack areas, clear recoil, brief invulnerability after damage, readable health, and restrained enemy speed. A single attack may damage a target at most once, regardless of how many simulation frames overlap.

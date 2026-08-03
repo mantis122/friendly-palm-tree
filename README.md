@@ -1,33 +1,55 @@
-# Backyard Realms — Engine 0.4: Living Backyard
+# Backyard Realms — Engine 0.5 Combat Foundation
 
-This milestone turns the stable 0.3 prototype into a more reusable living-world foundation.
+This Android-first custom engine milestone adds the first complete reusable combat loop while retaining all verified Engine 0.4 systems.
 
-## Added
+## New in 0.5
 
-- Base entity hierarchy: entity, character, world object, effect, projectile
-- Generic behavior interface, used by Mia's idle behavior
-- Event bus with theme, interaction, movement, and attack events
-- Ambient drifting pollen/butterflies
-- Mia idle bobbing and blinking
-- World time framework: morning, afternoon, evening, night
-- Visual time-of-day tinting
-- Save/load using Android SharedPreferences
-- Saved player position, imagination theme, and world time
-- Asset-independent audio routing with ambient and action cue reporting
-- Expanded developer and debug panels
+- Reusable `HealthComponent`, `Damageable`, and `DamageHit` combat types
+- Player health HUD with five hearts
+- Directional attack hitbox and one-hit-per-swing behavior
+- Damage, recoil, invulnerability frames, and flashing feedback
+- Reusable fantasy enemy with wander, notice, chase, hurt, defeated, and respawn states
+- Enemy health bar
+- Contact damage and directional player knockback
+- Player defeat and automatic Moonkeep respawn
+- Combat events for damage, defeat, health changes, and respawn
+- Combat hitbox overlays and state reporting in the developer panel
+- Fantasy-only enemies; the real backyard remains safe
 
-## Test checklist
+## Build
 
-1. Build through GitHub Actions and install the APK.
-2. Confirm the prior 0.3 movement, camera, collision, dialogue, attack, and theme-switch behavior still works.
-3. Confirm small ambient particles drift through the yard.
-4. Watch Mia and confirm she subtly bobs and periodically blinks.
-5. Open DEV and push the joystick upward once; confirm time advances and the screen tint changes.
-6. Repeat to cycle MORNING → AFTERNOON → EVENING → NIGHT.
-7. In DEV, press ACTION and confirm theme switching still works.
-8. Close and relaunch the app; confirm player position, theme, and time are restored.
-9. Confirm the debug panel updates `audio=` after walking interactions, attacking, and switching themes.
-10. Confirm the debug panel updates `event=` after movement, attack, interaction, and theme switching.
-11. Confirm controls remain responsive and no severe frame-rate regression is visible.
+Push the project to GitHub and run `.github/workflows/android-build.yml`, then install the generated debug APK.
 
-No finished audio assets are included yet. The audio router is intentionally asset-independent so future WAV/OGG files can be assigned without changing gameplay systems.
+## Engine 0.5 verification checklist
+
+### Regression
+
+- [ ] Project builds successfully in GitHub Actions.
+- [ ] App launches in landscape full-screen mode.
+- [ ] Movement, camera, collisions, interaction, dialogue, time tinting, theme switching, and save/load still work.
+- [ ] DEV opens and closes correctly.
+
+### Combat
+
+- [ ] No enemy is visible or harmful in the real backyard.
+- [ ] Entering Fantasy reveals a purple Moon Blob near the central path.
+- [ ] The blob wanders while distant and chases when approached.
+- [ ] A stick swing damages the blob only when the red attack box overlaps it.
+- [ ] One swing removes only one health point, even if the boxes overlap for multiple frames.
+- [ ] The blob recoils, flashes, and briefly ignores repeated damage.
+- [ ] Three successful hits defeat it.
+- [ ] It disappears, then respawns automatically after roughly four seconds.
+- [ ] Touching it removes one heart and knocks the player away.
+- [ ] Player flashing prevents rapid repeated contact damage.
+- [ ] Losing all five hearts returns the player to Moonkeep with restored health.
+- [ ] Combat events and enemy state appear in the debug panel.
+
+### Developer tools
+
+- [ ] DEV + ACTION switches themes.
+- [ ] DEV + joystick UP advances time.
+- [ ] DEV + joystick DOWN immediately respawns the enemy.
+
+## Next milestone
+
+Engine 0.6 will turn these mechanics into the beginning of Chapter 1: acquiring the stick, a simple objective/flag system, a chest or pickup, guided Mia dialogue, and the first short playable quest loop.
