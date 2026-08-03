@@ -26,6 +26,7 @@ import com.example.backyardrealms.game.enemy.YardBlob
 import com.example.backyardrealms.game.items.TreasureChest
 import com.example.backyardrealms.game.items.BackyardItemInteractions
 import com.example.backyardrealms.game.items.WorldPickup
+import com.example.backyardrealms.game.story.ChapterOneDirector
 import com.example.backyardrealms.game.theme.ImaginationTheme
 import com.example.backyardrealms.game.theme.ThemeTransition
 import com.example.backyardrealms.game.world.Landmark
@@ -42,6 +43,7 @@ class BackyardGame(context: Context) {
     private val itemCatalog = ItemCatalog(context)
     private val inventory = Inventory(itemCatalog)
     private val questFlags = QuestFlags()
+    private val chapterOne = ChapterOneDirector(questFlags)
     private val itemInteractions = BackyardItemInteractions()
     private val player = Player(saved.playerX, saved.playerY, playerSheet)
     private val friend = FriendNpc(470f, 250f)
@@ -83,10 +85,25 @@ class BackyardGame(context: Context) {
     init {
         inventory.restore(saved.inventory, saved.equippedItemId)
         questFlags.restore(saved.questFlags)
+        val freshChapter = chapterOne.initializeFreshChapter()
+        if (freshChapter) {
+            player.setPosition(470f, 214f)
+            theme = ImaginationTheme.REAL
+        }
         val opened = saved.openedChests.split(',').filter { it.isNotBlank() }.toSet()
         chest.opened = chest.id in opened
         val collected = saved.collectedPickups.split(',').filter { it.isNotBlank() }.toSet()
         pickups.forEach { it.collected = it.id in collected }
+        if (freshChapter) {
+            inventory.remove("stick", inventory.quantity("stick"))
+            inventory.remove("summer_berry", inventory.quantity("summer_berry"))
+            inventory.remove("brass_key", inventory.quantity("brass_key"))
+            inventory.equip(null)
+            listOf("HAS_STICK", "MET_MIA", "OPENED_FIRST_CHEST", "CLEARED_GARDEN_WEEDS", "ENTERED_FANTASY")
+                .forEach(questFlags::clear)
+            chest.opened = false
+            pickups.forEach { it.collected = false }
+        }
         landmarks.forEach { it.theme = theme }
         friend.theme = theme
         audio.setTheme(theme)
@@ -102,6 +119,7 @@ class BackyardGame(context: Context) {
 
     fun update(dt: Float, input: InputSnapshot) {
         transition.update(dt)
+        chapterOne.update(dt)
         friend.update(dt)
         particles.forEach { it.update(dt) }
         pickups.forEach { it.update(dt) }
@@ -146,7 +164,13 @@ class BackyardGame(context: Context) {
         when {
             input.actionPressed && dialogue != null -> dialogue = null
             input.actionPressed && nearbyInteractable is TreasureChest -> openChest(nearbyInteractable as TreasureChest)
-            input.actionPressed && nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> startThemeSwitch()
+            input.actionPressed && nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> {
+                if (theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy()) {
+                    dialogue = chapterOne.fortBlockedMessage()
+                } else {
+                    startThemeSwitch()
+                }
+            }
             input.actionPressed && nearbyInteractable != null -> interactWith(nearbyInteractable!!)
             else -> updateGameplay(dt, input)
         }
@@ -185,7 +209,11 @@ class BackyardGame(context: Context) {
             val wasAlive = enemy.health.isAlive
             if (enemy.receiveHit(DamageHit("player", itemCatalog["stick"]?.damage ?: 1, knockback.first, knockback.second, player.currentAttackId))) {
                 eventBus.post(GameEvent.DamageDealt("player", enemy.id, 1))
-                if (wasAlive && !enemy.health.isAlive) eventBus.post(GameEvent.EntityDefeated(enemy.id))
+                if (wasAlive && !enemy.health.isAlive) {
+                    eventBus.post(GameEvent.EntityDefeated(enemy.id))
+                    chapterOne.onMoonBlobDefeated()
+                    saveGame()
+                }
             }
         }
         if (enemy.active && RectF.intersects(player.hurtBounds, enemy.contactBounds)) {
@@ -207,6 +235,7 @@ class BackyardGame(context: Context) {
                 if (pickup.itemId == "stick") {
                     inventory.equip("stick")
                     questFlags.set("HAS_STICK")
+                    chapterOne.onStickCollected()
                 }
                 dialogue = "Picked up ${item?.name ?: pickup.itemId}."
                 saveGame()
@@ -243,8 +272,12 @@ class BackyardGame(context: Context) {
                 return
             }
         }
-        if (target is FriendNpc) questFlags.set("MET_MIA")
-        dialogue = target.interactionText()
+        if (target is FriendNpc) {
+            questFlags.set("MET_MIA")
+            dialogue = chapterOne.miaDialogue(theme)
+        } else {
+            dialogue = target.interactionText()
+        }
         saveGame()
     }
 
@@ -256,7 +289,13 @@ class BackyardGame(context: Context) {
         questFlags.clear("HAS_STICK"); questFlags.clear("OPENED_FIRST_CHEST"); questFlags.clear("CLEARED_GARDEN_WEEDS")
         chest.opened = false
         pickups.forEach { it.collected = false }
-        dialogue = "Item tests reset."
+        chapterOne.reset()
+        player.setPosition(470f, 214f)
+        theme = ImaginationTheme.REAL
+        landmarks.forEach { it.theme = theme }
+        friend.theme = theme
+        audio.setTheme(theme)
+        dialogue = "Chapter 1 reset. Close DEV to replay the opening."
         saveGame()
     }
 
@@ -290,7 +329,11 @@ class BackyardGame(context: Context) {
             theme = theme.toggled()
             landmarks.forEach { it.theme = theme }
             friend.theme = theme
-            if (theme == ImaginationTheme.FANTASY) { enemy.forceRespawn(); questFlags.set("ENTERED_FANTASY") }
+            if (theme == ImaginationTheme.FANTASY) {
+                enemy.forceRespawn()
+                questFlags.set("ENTERED_FANTASY")
+                chapterOne.onFantasyEntered()
+            }
             eventBus.post(GameEvent.ThemeChanged(theme.name))
             saveGame()
         }
@@ -311,11 +354,13 @@ class BackyardGame(context: Context) {
         drawTimeOverlay(canvas)
         drawHealthHud(canvas)
         drawEquippedHud(canvas)
+        drawObjectiveHud(canvas)
         drawPrompt(canvas)
         drawDialogue(canvas)
         if (showDebug) drawDebugPanel(canvas)
         if (inventoryOpen) drawInventoryPanel(canvas)
         if (developerOpen) drawDeveloperPanel(canvas)
+        drawStoryBanner(canvas)
         if (transition.alpha > 0f) {
             paint.color = ((transition.alpha * 255).toInt().coerceIn(0, 255) shl 24)
             canvas.drawRect(0f, 0f, GameConfig.LOGICAL_WIDTH, GameConfig.LOGICAL_HEIGHT, paint)
@@ -352,11 +397,34 @@ class BackyardGame(context: Context) {
         paint.textSize = 9f; canvas.drawText(equipped, 434f, 69f, paint)
     }
 
+    private fun drawObjectiveHud(canvas: Canvas) {
+        if (developerOpen || inventoryOpen || chapterOne.bannerTimer > 0f) return
+        paint.color = 0xC9141414.toInt()
+        canvas.drawRoundRect(108f, 82f, 372f, 108f, 6f, 6f, paint)
+        paint.color = 0xFFFFE9A8.toInt()
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 8.5f
+        canvas.drawText("OBJECTIVE: ${chapterOne.objective(theme)}", 240f, 99f, paint)
+    }
+
+    private fun drawStoryBanner(canvas: Canvas) {
+        val title = chapterOne.bannerTitle ?: return
+        paint.color = 0xD9000000.toInt()
+        canvas.drawRect(0f, 88f, GameConfig.LOGICAL_WIDTH, 178f, paint)
+        paint.color = 0xFFFFFFFF.toInt()
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 23f
+        canvas.drawText(title, 240f, 125f, paint)
+        paint.color = 0xFFFFE2A1.toInt()
+        paint.textSize = 11f
+        canvas.drawText(chapterOne.bannerSubtitle.orEmpty(), 240f, 149f, paint)
+    }
+
     private fun drawPrompt(canvas: Canvas) {
         if (dialogue != null || nearbyInteractable == null || developerOpen || inventoryOpen) return
         paint.color = 0xCC000000.toInt(); canvas.drawRoundRect(170f, 222f, 310f, 250f, 6f, 6f, paint)
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.CENTER; paint.textSize = 11f
-        val text = when { nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> "ACTION: SWITCH WORLD"; nearbyInteractable is TreasureChest -> "ACTION: OPEN"; else -> "ACTION: INTERACT" }
+        val text = when { nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> if (theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy()) "ACTION: CHECK FORT" else "ACTION: SWITCH WORLD"; nearbyInteractable is TreasureChest -> "ACTION: OPEN"; else -> "ACTION: INTERACT" }
         canvas.drawText(text, 240f, 240f, paint)
     }
 
@@ -381,7 +449,7 @@ class BackyardGame(context: Context) {
     private fun drawDebugPanel(canvas: Canvas) {
         paint.color = 0xCC000000.toInt(); canvas.drawRect(6f, 6f, 320f, 80f, paint)
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.LEFT; paint.textSize = 10f
-        canvas.drawText("Backyard Engine 1.0", 12f, 18f, paint)
+        canvas.drawText("Backyard Realms Ch.1 M1", 12f, 18f, paint)
         canvas.drawText("theme=$theme time=$worldTime", 12f, 30f, paint)
         canvas.drawText("${player.positionText()} hp=${player.health.current}/${player.health.maximum}", 12f, 42f, paint)
         canvas.drawText("equipped=${inventory.equippedItemId ?: "none"} slots=${inventory.allSlots().size}", 12f, 54f, paint)
@@ -467,7 +535,7 @@ class BackyardGame(context: Context) {
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.CENTER; paint.textSize = 16f; canvas.drawText("ENGINE PLAYGROUND / CONTENT", 240f, 52f, paint)
         paint.textSize = 10f
         canvas.drawText("ACTION theme  •  UP time  •  DOWN enemy", 240f, 70f, paint)
-        canvas.drawText("LEFT reset item tests  •  RIGHT equip/unequip stick", 240f, 84f, paint)
+        canvas.drawText("LEFT reset Chapter 1  •  RIGHT equip/unequip stick", 240f, 84f, paint)
         canvas.drawText("ITEM CATALOG", 240f, 105f, paint)
         itemCatalog.all().forEachIndexed { index, item ->
             val y = 124f + index * 30f

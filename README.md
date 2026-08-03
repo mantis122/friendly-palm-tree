@@ -1,92 +1,77 @@
-# Backyard Realms — Backyard Engine 1.0.1
+# Backyard Realms — Chapter 1, Milestone 1
 
-This is the first stable, reusable release of the Android-first custom action-RPG engine. It retains every verified Engine 0.5 system and adds the complete inventory/world-interaction milestone that begins the transition into Chapter 1 development.
+This is the first game-content milestone built on Backyard Engine 1.0. It turns the previously freeform systems into a saved, guided opening sequence while keeping all existing inventory, combat, theme, developer, and world systems available.
 
-## New in Engine 1.0
+## Version
 
-- Data-driven item catalog loaded from `app/src/main/assets/items.json`
-- Generic item definitions, stacks, inventory slots, capacity, add/remove, and serialization
-- One equipped-item slot
-- New **BAG** touch button and inventory panel
-- Favorite Stick, Summer Berry, and Tiny Brass Key definitions
-- World pickups with bobbing visuals and persistent collection state
-- Favorite Stick pickup beneath the old tree
-- Automatic stick equipment after pickup
-- One-time treasure chest with persistent open state
-- Chest containing a key and three berries
-- Generic quest-flag service with save integration
-- Flags for meeting Mia, finding the stick, entering Fantasy, opening the chest, and clearing the garden weeds
-- Generic item-to-world interaction resolver
-- First item puzzle: use the equipped stick at the garden to uncover a berry
-- Combat now requires the stick to be equipped
-- Save migration that preserves old 0.5 position/theme/time data while adding inventory state
-- Engine Playground controls for resetting item tests and toggling stick equipment
-- First in-app Content Browser page showing every loaded item definition
-- Version name `1.0.0`
+- App version: **1.1.0**
+- Milestone: **Chapter 1 — Opening Adventure**
 
-## Build
+## Playable opening
 
-Push the project to GitHub and run `.github/workflows/android-build.yml`, then install the generated debug APK.
+1. The game begins outside the fort with the title **SUMMER VACATION**.
+2. The objective asks you to speak with Mia.
+3. Mia asks you to recover your Favorite Stick from beneath the old tree.
+4. Collecting the stick equips it automatically and updates the objective.
+5. Return to Mia and show her the stick.
+6. Go to the fort and begin the imaginary game.
+7. The backyard transforms into **THE MOON KINGDOM**.
+8. Defeat the Moon Blob.
+9. Return to Sir Mia to complete the opening milestone.
 
-## Engine 1.0 verification checklist
+Progress is stored through the existing quest-flag save system and survives closing and reopening the app.
 
-### Regression
+## Developer replay control
 
-- [ ] GitHub Actions builds successfully.
-- [ ] The app launches in landscape full-screen mode.
-- [ ] Movement, camera, collision, interaction, dialogue, time tinting, imagination switching, ambience, combat, enemy AI, defeat/respawn, and DEV controls still work.
-- [ ] Existing Engine 0.5 save data loads without crashing.
+Open **DEV** and push the joystick **left once** to reset Chapter 1. This clears the opening inventory/story state, restores the stick pickup, closes the chest, returns to the real backyard, and moves the player to the opening position.
 
-### Inventory and equipment
+Other developer controls remain:
 
-- [ ] A **BAG** button appears beside **DEV**.
-- [ ] BAG opens and closes the backpack panel; ACTION also closes it.
-- [ ] A fresh/reset game begins without the stick equipped.
-- [ ] Pressing ACTION away from an interactable while unarmed displays a message instead of attacking.
-- [ ] The Favorite Stick appears just southeast of the old tree.
-- [ ] Walking over it collects it, shows pickup dialogue, sets `HAS_STICK`, and equips it automatically.
-- [ ] The backpack lists Favorite Stick with `[E]`.
-- [ ] Stick attacks and Moon Blob combat work after equipping it.
+- ACTION: switch theme
+- Joystick up: advance time
+- Joystick down: respawn enemy
+- Joystick right: equip or unequip the stick
 
-### Pickups, chest, and item interaction
+## Test checklist
 
-- [ ] A berry pickup appears below-left of the garden and can be collected.
-- [ ] A chest appears near the lower central path.
-- [ ] ACTION near the chest opens it and grants Tiny Brass Key x1 and Summer Berry x3.
-- [ ] Reopening the chest says it is empty and grants nothing else.
-- [ ] With the stick equipped, interacting with the garden once clears the weeds and grants one berry.
-- [ ] Repeating the garden interaction does not grant another berry.
+### Build and regression
+
+- [ ] GitHub Actions build succeeds.
+- [ ] APK installs and launches.
+- [ ] Movement, camera, collision, BAG, DEV, dialogue, and touch controls still work.
+- [ ] Existing time-of-day and ambience state still work.
+
+### Opening sequence
+
+- [ ] Use DEV + joystick left to reset Chapter 1 before testing.
+- [ ] Closing DEV shows the **SUMMER VACATION** banner.
+- [ ] The first objective says to talk to Mia.
+- [ ] Mia directs the player to the old tree.
+- [ ] Trying the fort too early gives an appropriate story message instead of transforming.
+- [ ] The Favorite Stick is present below/right of the old tree.
+- [ ] Collecting it equips it and changes the objective.
+- [ ] Mia recognizes that the stick was found and directs the player to the fort.
+- [ ] The fort now triggers the fade and fantasy transformation.
+- [ ] **THE MOON KINGDOM** banner appears after transformation.
+- [ ] The objective asks the player to defeat the Moon Blob.
+- [ ] Defeating the Moon Blob changes the objective to talking to Sir Mia.
+- [ ] Talking to Sir Mia displays the Chapter 1 completion banner.
 
 ### Persistence
 
-- [ ] Move, collect the stick and berry, open the chest, clear the garden weeds, change theme/time, then fully close the app.
-- [ ] Reopening restores position, theme, time, inventory quantities, equipped stick, collected pickups, opened chest, and quest flags.
-- [ ] The collected stick and berry do not reappear.
-- [ ] The chest remains visibly open.
+- [ ] Close and reopen during the stick objective; progress resumes correctly.
+- [ ] Close and reopen after entering fantasy; theme and objective resume correctly.
+- [ ] Close and reopen after defeating the Moon Blob; the completion step remains available.
+- [ ] Complete the milestone, reopen the app, and confirm completion remains saved.
 
-### Engine Playground / Content Browser
+### Existing Engine 1.0 features
 
-Open DEV:
+- [ ] BAG descriptions remain readable.
+- [ ] The garden stick interaction still works.
+- [ ] The chest still awards its contents once and remains open after restart.
+- [ ] Player health, enemy contact damage, knockback, defeat, and respawn still work.
+- [ ] The real backyard remains free of the Moon Blob.
 
-- [ ] The panel lists the item catalog loaded from JSON, including stack/equip/use/quest/damage properties.
-- [ ] ACTION switches theme.
-- [ ] Joystick UP advances time.
-- [ ] Joystick DOWN respawns the enemy.
-- [ ] Joystick LEFT resets all item tests, closes the chest state, and respawns pickups.
-- [ ] Joystick RIGHT gives the stick when needed and toggles whether it is equipped.
+## Architecture
 
-## Stable engine boundary
-
-Reusable mechanisms live under `engine/`; Backyard-specific content and rules live under `game/`. Engine 1.0 is considered the stable foundation. Future work should be additive unless a verified correctness issue requires a core change.
-
-## Next milestone
-
-**Backyard Realms — Chapter 1, Milestone 1:** opening sequence, objective progression, guided Mia dialogue, waking in the fort, finding the stick, returning to Mia, and the first authored transformation into Fantasy.
-
-
-## 1.0.1 backpack readability fix
-
-- Inventory uses full-width cards.
-- Item descriptions wrap to two readable lines instead of clipping.
-- Backpack pages hold three items each.
-- Use joystick up/down to move between pages when more than three item stacks exist.
+The new `game/story/ChapterOneDirector.kt` is intentionally game-specific. It interprets generic quest flags as objectives, dialogue progression, and title banners. The reusable engine remains unaware of Mia, the backyard, the Favorite Stick, or the Moon Kingdom.
