@@ -3,12 +3,7 @@ package com.example.backyardrealms.game.story
 import com.example.backyardrealms.engine.quest.QuestFlags
 import com.example.backyardrealms.game.theme.ImaginationTheme
 
-/**
- * Game-specific story direction for the opening of Backyard Realms.
- *
- * The engine owns flags and persistence. This class only interprets those flags
- * as Chapter 1 objectives and dialogue.
- */
+/** Game-specific direction for Chapter 1. */
 class ChapterOneDirector(private val flags: QuestFlags) {
     var bannerTitle: String? = null
         private set
@@ -27,10 +22,7 @@ class ChapterOneDirector(private val flags: QuestFlags) {
     fun update(dt: Float) {
         if (bannerTimer <= 0f) return
         bannerTimer = (bannerTimer - dt).coerceAtLeast(0f)
-        if (bannerTimer == 0f) {
-            bannerTitle = null
-            bannerSubtitle = null
-        }
+        if (bannerTimer == 0f) { bannerTitle = null; bannerSubtitle = null }
     }
 
     fun objective(theme: ImaginationTheme): String = when {
@@ -39,82 +31,73 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         !flags.has(MIA_APPROVED_STICK) -> "Show Mia that you found the stick."
         !flags.has(ENTERED_FANTASY) -> "Meet Mia at the fort and begin the game."
         theme == ImaginationTheme.FANTASY && !flags.has(DEFEATED_MOON_BLOB) -> "Defeat the Moon Blob."
-        flags.has(DEFEATED_MOON_BLOB) && !flags.has(CHAPTER_COMPLETE) -> "Talk to Sir Mia."
-        flags.has(CHAPTER_COMPLETE) -> "Explore the Moon Kingdom."
+        flags.has(DEFEATED_MOON_BLOB) && !flags.has(FIRST_TRIAL_COMPLETE) -> "Talk to Sir Mia."
+        !flags.has(SIGIL_QUEST_ACCEPTED) -> "Ask Sir Mia what happened."
+        !flags.has(GATE_UNLOCKED) -> "Find the brass key and unlock the Moon Gate."
+        !flags.has(MOON_SIGIL_FOUND) -> "Recover the Moon Sigil beyond the gate."
+        !flags.has(CHAPTER_COMPLETE) -> "Return the Moon Sigil to Sir Mia."
+        flags.has(CHAPTER_COMPLETE) -> "Explore the restored Moon Kingdom."
         else -> "Return to the fantasy realm."
     }
 
     fun miaDialogue(theme: ImaginationTheme): String {
         if (theme == ImaginationTheme.FANTASY) {
             return when {
-                flags.has(DEFEATED_MOON_BLOB) && !flags.has(CHAPTER_COMPLETE) -> {
+                flags.has(MOON_SIGIL_FOUND) && !flags.has(CHAPTER_COMPLETE) -> {
                     flags.set(CHAPTER_COMPLETE)
-                    showBanner("CHAPTER 1", "The adventure has begun", 3.4f)
-                    "You did it! Sir Mia officially names you Guardian of Moonkeep."
+                    showBanner("MOON SIGIL RESTORED", "The first quest is complete", 3.4f)
+                    "You found it! The Moon Sigil is safe, and Moonkeep shines again."
                 }
-                flags.has(CHAPTER_COMPLETE) -> "Guardian! The Moon Kingdom is waiting for us."
+                flags.has(CHAPTER_COMPLETE) -> "Guardian, the Moon Kingdom has many more secrets."
+                flags.has(DEFEATED_MOON_BLOB) && !flags.has(SIGIL_QUEST_ACCEPTED) -> {
+                    flags.set(FIRST_TRIAL_COMPLETE)
+                    flags.set(SIGIL_QUEST_ACCEPTED)
+                    showBanner("THE STOLEN SIGIL", "Search beyond the Goblin Fort", 3.0f)
+                    "Excellent! But the Moon Goblins stole our silver sigil. The tiny brass key opens their gate."
+                }
+                flags.has(SIGIL_QUEST_ACCEPTED) -> "The Moon Gate is beside the Goblin Fort. Find the key, then recover our sigil!"
                 else -> "Look out! A Moon Blob is guarding the path. Try your stick!"
             }
         }
-
         return when {
-            !flags.has(TALKED_TO_MIA) -> {
-                flags.set(TALKED_TO_MIA)
-                "Come on! I thought we were going to play today. Your favorite stick is by the old tree."
-            }
+            !flags.has(TALKED_TO_MIA) -> { flags.set(TALKED_TO_MIA); "Come on! I thought we were going to play today. Your favorite stick is by the old tree." }
             !flags.has(FOUND_STICK) -> "Your stick should still be beneath the old tree. I'll wait here."
-            !flags.has(MIA_APPROVED_STICK) -> {
-                flags.set(MIA_APPROVED_STICK)
-                "Perfect! That's definitely a legendary sword. Meet me at the fort!"
-            }
+            !flags.has(MIA_APPROVED_STICK) -> { flags.set(MIA_APPROVED_STICK); "Perfect! That's definitely a legendary sword. Meet me at the fort!" }
             !flags.has(ENTERED_FANTASY) -> "Ready? Use the fort and we'll start the adventure."
             else -> "Want to visit the Moon Kingdom again?"
         }
     }
 
-    fun onStickCollected() {
-        if (!flags.has(FOUND_STICK)) flags.set(FOUND_STICK)
-    }
-
+    fun onStickCollected() { flags.set(FOUND_STICK) }
     fun canBeginFantasy(): Boolean = flags.has(MIA_APPROVED_STICK) || flags.has(ENTERED_FANTASY)
-
     fun fortBlockedMessage(): String = when {
         !flags.has(TALKED_TO_MIA) -> "Mia is waiting outside. You should talk to her first."
         !flags.has(FOUND_STICK) -> "You promised to find your favorite stick first."
         else -> "Show Mia the stick before you begin."
     }
-
     fun onFantasyEntered() {
-        if (!flags.has(ENTERED_FANTASY)) {
-            flags.set(ENTERED_FANTASY)
-            showBanner("THE MOON KINGDOM", "Where the backyard becomes a realm", 3.4f)
+        if (!flags.has(ENTERED_FANTASY)) { flags.set(ENTERED_FANTASY); showBanner("THE MOON KINGDOM", "Where the backyard becomes a realm", 3.4f) }
+    }
+    fun onMoonBlobDefeated(enemyId: String) {
+        if (enemyId == "moon_blob" && !flags.has(DEFEATED_MOON_BLOB)) {
+            flags.set(DEFEATED_MOON_BLOB); showBanner("PATH CLEARED", "Talk to Sir Mia", 2.4f)
         }
     }
-
-    fun onMoonBlobDefeated() {
-        if (!flags.has(DEFEATED_MOON_BLOB)) {
-            flags.set(DEFEATED_MOON_BLOB)
-            showBanner("PATH CLEARED", "Talk to Sir Mia", 2.4f)
-        }
-    }
+    fun onGateUnlocked() { flags.set(GATE_UNLOCKED); showBanner("MOON GATE OPEN", "The Goblin Fort lies ahead", 2.4f) }
+    fun onSigilFound() { flags.set(MOON_SIGIL_FOUND); showBanner("MOON SIGIL FOUND", "Return to Sir Mia", 2.4f) }
+    fun questAccepted(): Boolean = flags.has(SIGIL_QUEST_ACCEPTED)
+    fun gateUnlocked(): Boolean = flags.has(GATE_UNLOCKED)
+    fun sigilFound(): Boolean = flags.has(MOON_SIGIL_FOUND)
 
     fun reset() {
-        listOf(
-            CHAPTER_STARTED,
-            TALKED_TO_MIA,
-            FOUND_STICK,
-            MIA_APPROVED_STICK,
-            ENTERED_FANTASY,
-            DEFEATED_MOON_BLOB,
-            CHAPTER_COMPLETE
-        ).forEach(flags::clear)
+        listOf(CHAPTER_STARTED,TALKED_TO_MIA,FOUND_STICK,MIA_APPROVED_STICK,ENTERED_FANTASY,
+            DEFEATED_MOON_BLOB,FIRST_TRIAL_COMPLETE,SIGIL_QUEST_ACCEPTED,GATE_UNLOCKED,
+            MOON_SIGIL_FOUND,CHAPTER_COMPLETE).forEach(flags::clear)
         initializeFreshChapter()
     }
 
     private fun showBanner(title: String, subtitle: String, duration: Float) {
-        bannerTitle = title
-        bannerSubtitle = subtitle
-        bannerTimer = duration
+        bannerTitle = title; bannerSubtitle = subtitle; bannerTimer = duration
     }
 
     companion object {
@@ -124,6 +107,10 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         const val MIA_APPROVED_STICK = "CH1_MIA_APPROVED_STICK"
         const val ENTERED_FANTASY = "CH1_ENTERED_FANTASY"
         const val DEFEATED_MOON_BLOB = "CH1_DEFEATED_MOON_BLOB"
+        const val FIRST_TRIAL_COMPLETE = "CH1_FIRST_TRIAL_COMPLETE"
+        const val SIGIL_QUEST_ACCEPTED = "CH1_SIGIL_QUEST_ACCEPTED"
+        const val GATE_UNLOCKED = "CH1_GATE_UNLOCKED"
+        const val MOON_SIGIL_FOUND = "CH1_MOON_SIGIL_FOUND"
         const val CHAPTER_COMPLETE = "CH1_COMPLETE"
     }
 }

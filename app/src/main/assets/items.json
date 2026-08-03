@@ -32,4 +32,16 @@
     "damage": 0,
     "iconColor": "#E7C85B"
   }
+,
+  {
+    "id": "moon_sigil",
+    "name": "Moon Sigil",
+    "description": "A silver cardboard crest rescued from beyond the Goblin Fort.",
+    "maxStack": 1,
+    "equippable": false,
+    "usable": false,
+    "questItem": true,
+    "damage": 0,
+    "iconColor": "#AFC9F4"
+  }
 ]

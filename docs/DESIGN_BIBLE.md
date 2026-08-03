@@ -70,3 +70,7 @@ Flags are stable string identifiers and are serialized as save data. Existing fl
 ## Development rule
 
 Every reusable mechanism must have an immediately playable Backyard Realms use case and a developer test path.
+
+## Chapter 1 Milestone 2 — First Quest
+
+The first complete quest reuses previously introduced content rather than discarding it. The Tiny Brass Key from the first chest opens the fantasy-only Moon Gate. Beyond it, a compact combat encounter protects the Moon Sigil. Quest progress is represented entirely by persistent flags and item state; the engine remains unaware of the story meaning.

@@ -1,77 +1,82 @@
-# Backyard Realms — Chapter 1, Milestone 1
+# Backyard Realms — Chapter 1, Milestone 2
 
-This is the first game-content milestone built on Backyard Engine 1.0. It turns the previously freeform systems into a saved, guided opening sequence while keeping all existing inventory, combat, theme, developer, and world systems available.
+Version 1.2.0 extends the verified opening into the game's first complete quest.
 
-## Version
+## New playable sequence
 
-- App version: **1.1.0**
-- Milestone: **Chapter 1 — Opening Adventure**
+After completing the original Moon Blob trial:
 
-## Playable opening
+1. Talk to Sir Mia.
+2. She reveals that the Moon Sigil was stolen and taken beyond the Goblin Fort.
+3. Open the existing chest near the lower path to obtain the Tiny Brass Key.
+4. Find the Moon Gate beside the Goblin Fort in Fantasy.
+5. Interact with the locked gate. The key is consumed and the gate opens.
+6. Pass through and defeat the two Moon Blobs guarding the far side.
+7. Collect the Moon Sigil.
+8. Return it to Sir Mia to complete the first full quest.
 
-1. The game begins outside the fort with the title **SUMMER VACATION**.
-2. The objective asks you to speak with Mia.
-3. Mia asks you to recover your Favorite Stick from beneath the old tree.
-4. Collecting the stick equips it automatically and updates the objective.
-5. Return to Mia and show her the stick.
-6. Go to the fort and begin the imaginary game.
-7. The backyard transforms into **THE MOON KINGDOM**.
-8. Defeat the Moon Blob.
-9. Return to Sir Mia to complete the opening milestone.
+## New systems/content
 
-Progress is stored through the existing quest-flag save system and survives closing and reopening the app.
-
-## Developer replay control
-
-Open **DEV** and push the joystick **left once** to reset Chapter 1. This clears the opening inventory/story state, restores the stick pickup, closes the chest, returns to the real backyard, and moves the player to the opening position.
-
-Other developer controls remain:
-
-- ACTION: switch theme
-- Joystick up: advance time
-- Joystick down: respawn enemy
-- Joystick right: equip or unequip the stick
+- Fantasy-only Moon Gate with collision and persistent unlocked state
+- Tiny Brass Key now has a required story use
+- Moon Sigil data-driven quest item
+- Moon Sigil world pickup and persistence
+- Two additional Moon Blob encounters beyond the gate
+- Expanded Chapter 1 objective and dialogue flow
+- Story banners for quest acceptance, gate opening, sigil recovery, and completion
+- Save migration from Chapter 1 Milestone 1
+- Version 1.2.0
 
 ## Test checklist
 
 ### Build and regression
 
-- [ ] GitHub Actions build succeeds.
-- [ ] APK installs and launches.
-- [ ] Movement, camera, collision, BAG, DEV, dialogue, and touch controls still work.
-- [ ] Existing time-of-day and ambience state still work.
+- [ ] GitHub Actions builds successfully.
+- [ ] App launches without crashing.
+- [ ] Movement, camera, collision, BAG, DEV, theme switching, combat, and save/load still work.
+- [ ] Existing Milestone 1 save loads without resetting the opening.
 
-### Opening sequence
+### Continued-save path
 
-- [ ] Use DEV + joystick left to reset Chapter 1 before testing.
-- [ ] Closing DEV shows the **SUMMER VACATION** banner.
-- [ ] The first objective says to talk to Mia.
-- [ ] Mia directs the player to the old tree.
-- [ ] Trying the fort too early gives an appropriate story message instead of transforming.
-- [ ] The Favorite Stick is present below/right of the old tree.
-- [ ] Collecting it equips it and changes the objective.
-- [ ] Mia recognizes that the stick was found and directs the player to the fort.
-- [ ] The fort now triggers the fade and fantasy transformation.
-- [ ] **THE MOON KINGDOM** banner appears after transformation.
-- [ ] The objective asks the player to defeat the Moon Blob.
-- [ ] Defeating the Moon Blob changes the objective to talking to Sir Mia.
-- [ ] Talking to Sir Mia displays the Chapter 1 completion banner.
+- [ ] A save that completed Milestone 1 has the objective `Ask Sir Mia what happened.`
+- [ ] Talking to Sir Mia begins **THE STOLEN SIGIL** quest.
 
-### Persistence
+### Gate and key
 
-- [ ] Close and reopen during the stick objective; progress resumes correctly.
-- [ ] Close and reopen after entering fantasy; theme and objective resume correctly.
-- [ ] Close and reopen after defeating the Moon Blob; the completion step remains available.
-- [ ] Complete the milestone, reopen the app, and confirm completion remains saved.
+- [ ] Moon Gate appears only in Fantasy beside the Goblin Fort.
+- [ ] Gate blocks physical passage while locked.
+- [ ] Interacting before accepting the quest gives a story-appropriate message.
+- [ ] Interacting without the key instructs the player to search the chest.
+- [ ] Opening the chest provides the Tiny Brass Key if it was not previously opened.
+- [ ] Using the key opens the gate and removes the key from BAG.
+- [ ] The gate remains open after switching themes and after restarting the app.
 
-### Existing Engine 1.0 features
+### Sigil encounter
 
-- [ ] BAG descriptions remain readable.
-- [ ] The garden stick interaction still works.
-- [ ] The chest still awards its contents once and remains open after restart.
-- [ ] Player health, enemy contact damage, knockback, defeat, and respawn still work.
-- [ ] The real backyard remains free of the Moon Blob.
+- [ ] Two additional Moon Blobs are present beyond the gate.
+- [ ] They use the established chase, damage, knockback, and defeat behavior.
+- [ ] The Moon Sigil appears beyond the gate.
+- [ ] Collecting it adds `Moon Sigil` to BAG and updates the objective.
+- [ ] The sigil remains collected after restarting the app.
 
-## Architecture
+### Quest completion
 
-The new `game/story/ChapterOneDirector.kt` is intentionally game-specific. It interprets generic quest flags as objectives, dialogue progression, and title banners. The reusable engine remains unaware of Mia, the backyard, the Favorite Stick, or the Moon Kingdom.
+- [ ] Returning to Sir Mia with the sigil displays **MOON SIGIL RESTORED**.
+- [ ] Objective changes to `Explore the restored Moon Kingdom.`
+- [ ] Completion remains saved after restarting.
+
+### Full replay
+
+Open DEV, push the joystick left once, then close DEV.
+
+- [ ] Chapter resets to the Summer Vacation opening.
+- [ ] Stick, key, Moon Sigil, chest, gate, and story flags reset.
+- [ ] Entire Milestone 1 and Milestone 2 sequence can be completed from a clean state.
+
+## Developer controls
+
+- **DEV + ACTION:** switch theme
+- **DEV + joystick up:** advance time
+- **DEV + joystick down:** respawn all Moon Blobs
+- **DEV + joystick left:** reset all Chapter 1 progress/content
+- **DEV + joystick right:** equip or unequip the stick

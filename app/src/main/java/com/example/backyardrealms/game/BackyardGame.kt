@@ -31,6 +31,7 @@ import com.example.backyardrealms.game.theme.ImaginationTheme
 import com.example.backyardrealms.game.theme.ThemeTransition
 import com.example.backyardrealms.game.world.Landmark
 import com.example.backyardrealms.game.world.LandmarkAppearance
+import com.example.backyardrealms.game.world.MoonGate
 import kotlin.math.sqrt
 
 class BackyardGame(context: Context) {
@@ -47,7 +48,11 @@ class BackyardGame(context: Context) {
     private val itemInteractions = BackyardItemInteractions()
     private val player = Player(saved.playerX, saved.playerY, playerSheet)
     private val friend = FriendNpc(470f, 250f)
-    private val enemy = YardBlob("moon_blob", 610f, 285f)
+    private val enemies = listOf(
+        YardBlob("moon_blob", 610f, 285f),
+        YardBlob("gate_blob_a", 785f, 270f),
+        YardBlob("gate_blob_b", 855f, 315f)
+    )
     private val eventBus = EventBus()
     private val audio = GameAudio()
     private var theme = saved.theme
@@ -71,13 +76,16 @@ class BackyardGame(context: Context) {
         Landmark("porch", RectF(370f, 486f, 590f, 530f), a(0xFF96714E.toInt(), "PORCH", "The back door is locked."), a(0xFF74523F.toInt(), "STONE BRIDGE", "Beyond lies the forbidden indoor realm."))
     )
     private val chest = TreasureChest("first_chest", 580f, 370f, listOf("brass_key" to 1, "summer_berry" to 3))
+    private val moonGate = MoonGate("moon_gate", RectF(690f, 202f, 714f, 350f))
     private val pickups = mutableListOf(
         WorldPickup("favorite_stick_pickup", "stick", 224f, 214f, itemCatalog),
-        WorldPickup("garden_berry_pickup", "summer_berry", 625f, 442f, itemCatalog)
+        WorldPickup("garden_berry_pickup", "summer_berry", 625f, 442f, itemCatalog),
+        WorldPickup("moon_sigil_pickup", "moon_sigil", 875f, 250f, itemCatalog)
     )
     private val particles = List(18) { i -> AmbientParticle("pollen_$i", WORLD_WIDTH, WORLD_HEIGHT, (i * 61f) % WORLD_WIDTH, 40f + (i * 83f) % (WORLD_HEIGHT - 80f), 4f + (i % 4), i * .7f) }
-    private val obstacles = landmarks.map { it.collisionBounds }
-    private val interactables: List<Interactable> = landmarks + friend + chest
+    private val baseObstacles = landmarks.map { it.collisionBounds }
+    private fun activeObstacles(): List<RectF> = if (theme == ImaginationTheme.FANTASY && !moonGate.unlocked) baseObstacles + moonGate.bounds else baseObstacles
+    private val interactables: List<Interactable> = landmarks + friend + chest + moonGate
     private var dialogue: String? = null
     private var nearbyInteractable: Interactable? = null
     private var showDebug = true
@@ -85,6 +93,12 @@ class BackyardGame(context: Context) {
     init {
         inventory.restore(saved.inventory, saved.equippedItemId)
         questFlags.restore(saved.questFlags)
+        // Migrate Chapter 1 Milestone 1 completion into the first-trial flag.
+        if (questFlags.has(ChapterOneDirector.CHAPTER_COMPLETE) &&
+            !questFlags.has(ChapterOneDirector.SIGIL_QUEST_ACCEPTED)) {
+            questFlags.clear(ChapterOneDirector.CHAPTER_COMPLETE)
+            questFlags.set(ChapterOneDirector.FIRST_TRIAL_COMPLETE)
+        }
         val freshChapter = chapterOne.initializeFreshChapter()
         if (freshChapter) {
             player.setPosition(470f, 214f)
@@ -94,15 +108,19 @@ class BackyardGame(context: Context) {
         chest.opened = chest.id in opened
         val collected = saved.collectedPickups.split(',').filter { it.isNotBlank() }.toSet()
         pickups.forEach { it.collected = it.id in collected }
+        moonGate.unlocked = chapterOne.gateUnlocked()
+        pickups.firstOrNull { it.id == "moon_sigil_pickup" }?.collected = chapterOne.sigilFound()
         if (freshChapter) {
             inventory.remove("stick", inventory.quantity("stick"))
             inventory.remove("summer_berry", inventory.quantity("summer_berry"))
             inventory.remove("brass_key", inventory.quantity("brass_key"))
+            inventory.remove("moon_sigil", inventory.quantity("moon_sigil"))
             inventory.equip(null)
             listOf("HAS_STICK", "MET_MIA", "OPENED_FIRST_CHEST", "CLEARED_GARDEN_WEEDS", "ENTERED_FANTASY")
                 .forEach(questFlags::clear)
             chest.opened = false
             pickups.forEach { it.collected = false }
+            moonGate.unlocked = false
         }
         landmarks.forEach { it.theme = theme }
         friend.theme = theme
@@ -164,6 +182,7 @@ class BackyardGame(context: Context) {
         when {
             input.actionPressed && dialogue != null -> dialogue = null
             input.actionPressed && nearbyInteractable is TreasureChest -> openChest(nearbyInteractable as TreasureChest)
+            input.actionPressed && nearbyInteractable is MoonGate -> interactWithGate()
             input.actionPressed && nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> {
                 if (theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy()) {
                     dialogue = chapterOne.fortBlockedMessage()
@@ -180,7 +199,7 @@ class BackyardGame(context: Context) {
     private fun updateDeveloper(input: InputSnapshot) {
         if (input.actionPressed) startThemeSwitch()
         if (kotlin.math.abs(input.moveY) > 0.7f && !verticalInputLatched) {
-            if (input.moveY < 0f) worldTime = worldTime.next() else enemy.forceRespawn()
+            if (input.moveY < 0f) worldTime = worldTime.next() else enemies.forEach { it.forceRespawn() }
             verticalInputLatched = true
             saveGame()
         }
@@ -197,38 +216,42 @@ class BackyardGame(context: Context) {
         val oldY = player.y
         val wasAttacking = player.isAttacking
         val canAttack = inventory.equippedItemId == "stick"
+        val obstacles = activeObstacles()
         player.update(dt, input, obstacles, worldBounds, canAttack)
         if (player.x != oldX || player.y != oldY) eventBus.post(GameEvent.PlayerMoved(player.x, player.y))
         if (!wasAttacking && player.isAttacking) eventBus.post(GameEvent.AttackStarted)
         if (input.actionPressed && !canAttack && nearbyInteractable == null) dialogue = "You need something to swing first."
 
         if (theme != ImaginationTheme.FANTASY) return
-        enemy.update(dt, player.centerX, player.centerY, obstacles, worldBounds)
-        if (player.isAttacking && enemy.active && RectF.intersects(player.attackBounds(), enemy.hurtBounds)) {
-            val knockback = player.attackKnockback()
-            val wasAlive = enemy.health.isAlive
-            if (enemy.receiveHit(DamageHit("player", itemCatalog["stick"]?.damage ?: 1, knockback.first, knockback.second, player.currentAttackId))) {
-                eventBus.post(GameEvent.DamageDealt("player", enemy.id, 1))
-                if (wasAlive && !enemy.health.isAlive) {
-                    eventBus.post(GameEvent.EntityDefeated(enemy.id))
-                    chapterOne.onMoonBlobDefeated()
-                    saveGame()
+        enemies.forEach { enemy ->
+            enemy.update(dt, player.centerX, player.centerY, obstacles, worldBounds)
+            if (player.isAttacking && enemy.active && RectF.intersects(player.attackBounds(), enemy.hurtBounds)) {
+                val knockback = player.attackKnockback()
+                val wasAlive = enemy.health.isAlive
+                if (enemy.receiveHit(DamageHit("player", itemCatalog["stick"]?.damage ?: 1, knockback.first, knockback.second, player.currentAttackId))) {
+                    eventBus.post(GameEvent.DamageDealt("player", enemy.id, 1))
+                    if (wasAlive && !enemy.health.isAlive) {
+                        eventBus.post(GameEvent.EntityDefeated(enemy.id))
+                        chapterOne.onMoonBlobDefeated(enemy.id)
+                        saveGame()
+                    }
                 }
             }
-        }
-        if (enemy.active && RectF.intersects(player.hurtBounds, enemy.contactBounds)) {
-            val dx = player.centerX - enemy.centerX; val dy = player.centerY - enemy.centerY
-            val length = sqrt(dx * dx + dy * dy).coerceAtLeast(0.001f)
-            if (player.receiveHit(DamageHit(enemy.id, 1, dx / length * 145f, dy / length * 145f, 0))) {
-                eventBus.post(GameEvent.DamageDealt(enemy.id, "player", 1))
-                eventBus.post(GameEvent.PlayerHealthChanged(player.health.current, player.health.maximum))
-                if (!player.health.isAlive) respawnPlayer()
+            if (enemy.active && RectF.intersects(player.hurtBounds, enemy.contactBounds)) {
+                val dx = player.centerX - enemy.centerX; val dy = player.centerY - enemy.centerY
+                val length = sqrt(dx * dx + dy * dy).coerceAtLeast(0.001f)
+                if (player.receiveHit(DamageHit(enemy.id, 1, dx / length * 145f, dy / length * 145f, 0))) {
+                    eventBus.post(GameEvent.DamageDealt(enemy.id, "player", 1))
+                    eventBus.post(GameEvent.PlayerHealthChanged(player.health.current, player.health.maximum))
+                    if (!player.health.isAlive) respawnPlayer()
+                }
             }
         }
     }
 
     private fun collectTouchingPickups() {
         pickups.filter { !it.collected && RectF.intersects(player.collisionBounds, it.bounds) }.forEach { pickup ->
+            if (pickup.id == "moon_sigil_pickup" && (theme != ImaginationTheme.FANTASY || !chapterOne.gateUnlocked())) return@forEach
             if (inventory.add(pickup.itemId) == 0) {
                 pickup.collected = true
                 val item = itemCatalog[pickup.itemId]
@@ -236,6 +259,8 @@ class BackyardGame(context: Context) {
                     inventory.equip("stick")
                     questFlags.set("HAS_STICK")
                     chapterOne.onStickCollected()
+                } else if (pickup.itemId == "moon_sigil") {
+                    chapterOne.onSigilFound()
                 }
                 dialogue = "Picked up ${item?.name ?: pickup.itemId}."
                 saveGame()
@@ -255,6 +280,27 @@ class BackyardGame(context: Context) {
         target.opened = true
         questFlags.set("OPENED_FIRST_CHEST")
         dialogue = if (received.isEmpty()) "The chest opens, but your bag is full." else "Found ${received.joinToString(" and ")}!"
+        saveGame()
+    }
+
+    private fun interactWithGate() {
+        eventBus.post(GameEvent.InteractionStarted(moonGate.id))
+        if (moonGate.unlocked) {
+            dialogue = moonGate.interactionText()
+            return
+        }
+        if (!chapterOne.questAccepted()) {
+            dialogue = "Sir Mia has not sent you beyond the Goblin Fort yet."
+            return
+        }
+        if (!inventory.contains("brass_key")) {
+            dialogue = "The Moon Gate needs a tiny brass key. Search the nearby chest."
+            return
+        }
+        inventory.remove("brass_key", 1)
+        moonGate.unlocked = true
+        chapterOne.onGateUnlocked()
+        dialogue = "The Tiny Brass Key clicks. The Moon Gate swings open!"
         saveGame()
     }
 
@@ -285,10 +331,12 @@ class BackyardGame(context: Context) {
         inventory.remove("stick", inventory.quantity("stick"))
         inventory.remove("summer_berry", inventory.quantity("summer_berry"))
         inventory.remove("brass_key", inventory.quantity("brass_key"))
+        inventory.remove("moon_sigil", inventory.quantity("moon_sigil"))
         inventory.equip(null)
         questFlags.clear("HAS_STICK"); questFlags.clear("OPENED_FIRST_CHEST"); questFlags.clear("CLEARED_GARDEN_WEEDS")
         chest.opened = false
         pickups.forEach { it.collected = false }
+        moonGate.unlocked = false
         chapterOne.reset()
         player.setPosition(470f, 214f)
         theme = ImaginationTheme.REAL
@@ -330,7 +378,7 @@ class BackyardGame(context: Context) {
             landmarks.forEach { it.theme = theme }
             friend.theme = theme
             if (theme == ImaginationTheme.FANTASY) {
-                enemy.forceRespawn()
+                enemies.forEach { it.forceRespawn() }
                 questFlags.set("ENTERED_FANTASY")
                 chapterOne.onFantasyEntered()
             }
@@ -345,9 +393,10 @@ class BackyardGame(context: Context) {
         particles.forEach { it.draw(canvas) }
         landmarks.forEach { it.draw(canvas) }
         chest.draw(canvas, paint)
-        pickups.forEach { it.draw(canvas, paint) }
+        if (theme == ImaginationTheme.FANTASY) moonGate.draw(canvas, paint)
+        pickups.filter { it.id != "moon_sigil_pickup" || (theme == ImaginationTheme.FANTASY && chapterOne.gateUnlocked()) }.forEach { it.draw(canvas, paint) }
         friend.draw(canvas)
-        if (theme == ImaginationTheme.FANTASY) enemy.draw(canvas)
+        if (theme == ImaginationTheme.FANTASY) enemies.forEach { it.draw(canvas) }
         player.draw(canvas)
         if (showDebug) drawWorldDebug(canvas)
         camera.end(canvas)
@@ -367,7 +416,9 @@ class BackyardGame(context: Context) {
         }
     }
 
-    private fun findNearestInteractable(): Interactable? = interactables.firstOrNull { RectF.intersects(player.collisionBounds, it.interactionBounds) }
+    private fun findNearestInteractable(): Interactable? = interactables.firstOrNull {
+        (it !is MoonGate || theme == ImaginationTheme.FANTASY) && RectF.intersects(player.collisionBounds, it.interactionBounds)
+    }
 
     private fun drawGround(canvas: Canvas) {
         paint.style = Paint.Style.FILL
@@ -440,16 +491,20 @@ class BackyardGame(context: Context) {
     private fun drawWorldDebug(canvas: Canvas) {
         paint.style = Paint.Style.STROKE; paint.strokeWidth = 1f; paint.color = 0x99FFFF00.toInt()
         landmarks.forEach { canvas.drawRect(it.collisionBounds, paint) }; canvas.drawRect(chest.bounds, paint)
+        if (theme == ImaginationTheme.FANTASY && !moonGate.unlocked) canvas.drawRect(moonGate.bounds, paint)
         paint.color = 0x9900FFFF.toInt(); nearbyInteractable?.let { canvas.drawRect(it.interactionBounds, paint) }
         if (player.isAttacking) { paint.color = 0x99FF3333.toInt(); canvas.drawRect(player.attackBounds(), paint) }
-        if (theme == ImaginationTheme.FANTASY && enemy.active) { paint.color = 0x99FF66FF.toInt(); canvas.drawRect(enemy.hurtBounds, paint); paint.color = 0x99FF9900.toInt(); canvas.drawRect(enemy.contactBounds, paint) }
+        if (theme == ImaginationTheme.FANTASY) enemies.filter { it.active }.forEach { enemy ->
+            paint.color = 0x99FF66FF.toInt(); canvas.drawRect(enemy.hurtBounds, paint)
+            paint.color = 0x99FF9900.toInt(); canvas.drawRect(enemy.contactBounds, paint)
+        }
         paint.style = Paint.Style.FILL
     }
 
     private fun drawDebugPanel(canvas: Canvas) {
         paint.color = 0xCC000000.toInt(); canvas.drawRect(6f, 6f, 320f, 80f, paint)
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.LEFT; paint.textSize = 10f
-        canvas.drawText("Backyard Realms Ch.1 M1", 12f, 18f, paint)
+        canvas.drawText("Backyard Realms Ch.1 M2", 12f, 18f, paint)
         canvas.drawText("theme=$theme time=$worldTime", 12f, 30f, paint)
         canvas.drawText("${player.positionText()} hp=${player.health.current}/${player.health.maximum}", 12f, 42f, paint)
         canvas.drawText("equipped=${inventory.equippedItemId ?: "none"} slots=${inventory.allSlots().size}", 12f, 54f, paint)
