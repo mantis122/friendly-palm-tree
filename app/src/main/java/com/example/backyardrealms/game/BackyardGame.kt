@@ -66,6 +66,7 @@ class BackyardGame(context: Context) {
     private var verticalInputLatched = false
     private var horizontalInputLatched = false
     private var firstTransformationPending = false
+    private var chapterEndingPending = false
 
     private fun a(color: Int, label: String, message: String) = LandmarkAppearance(color, label, message)
     private val landmarks = listOf(
@@ -186,6 +187,9 @@ class BackyardGame(context: Context) {
                 if (firstTransformationPending) {
                     firstTransformationPending = false
                     startThemeSwitch()
+                } else if (chapterEndingPending) {
+                    chapterEndingPending = false
+                    startThemeSwitch()
                 }
             }
             input.actionPressed && nearbyInteractable is TreasureChest -> openChest(nearbyInteractable as TreasureChest)
@@ -197,6 +201,10 @@ class BackyardGame(context: Context) {
                     }
                     theme == ImaginationTheme.REAL && !chapterOne.hasEnteredFantasy() -> {
                         beginFirstTransformationScene()
+                    }
+                    theme == ImaginationTheme.FANTASY && chapterOne.readyToReturnHome() &&
+                        !chapterOne.endingComplete() -> {
+                        beginChapterEndingScene()
                     }
                     else -> startThemeSwitch()
                 }
@@ -229,13 +237,49 @@ class BackyardGame(context: Context) {
         val canAttack = inventory.equippedItemId == "stick"
         val obstacles = activeObstacles()
         player.update(dt, input, obstacles, worldBounds, canAttack)
+        val playerVelocityX = if (dt > 0f) (player.x - oldX) / dt else 0f
+        val playerVelocityY = if (dt > 0f) (player.y - oldY) / dt else 0f
+        if (theme == ImaginationTheme.FANTASY && chapterOne.hasEnteredFantasy()) {
+            friend.updateCompanion(
+                dt,
+                player.centerX,
+                player.centerY,
+                playerVelocityX,
+                playerVelocityY,
+                obstacles,
+                worldBounds
+            )
+        }
         if (player.x != oldX || player.y != oldY) eventBus.post(GameEvent.PlayerMoved(player.x, player.y))
         if (!wasAttacking && player.isAttacking) eventBus.post(GameEvent.AttackStarted)
         if (input.actionPressed && !canAttack && nearbyInteractable == null) dialogue = "You need something to swing first."
 
         if (theme != ImaginationTheme.FANTASY) return
+
+        if (dialogue == null && !moonGate.unlocked &&
+            RectF.intersects(friend.interactionBounds, moonGate.interactionBounds)) {
+            chapterOne.companionGateReaction()?.let {
+                dialogue = it
+                saveGame()
+            }
+        }
+        val sigilPickup = pickups.firstOrNull { it.id == "moon_sigil_pickup" }
+        if (dialogue == null && sigilPickup != null && !sigilPickup.collected &&
+            chapterOne.gateUnlocked() &&
+            RectF.intersects(friend.interactionBounds, sigilPickup.bounds)) {
+            chapterOne.companionSigilReaction()?.let {
+                dialogue = it
+                saveGame()
+            }
+        }
+
         enemies.forEach { enemy ->
             enemy.update(dt, player.centerX, player.centerY, obstacles, worldBounds)
+            if (enemy.active && friend.tryShieldBash(enemy.centerX, enemy.centerY)) {
+                if (enemy.stun()) {
+                    eventBus.post(GameEvent.InteractionStarted("mia_shield_bash"))
+                }
+            }
             if (player.isAttacking && enemy.active && RectF.intersects(player.attackBounds(), enemy.hurtBounds)) {
                 val knockback = player.attackKnockback()
                 val wasAlive = enemy.health.isAlive
@@ -352,6 +396,7 @@ class BackyardGame(context: Context) {
         player.setPosition(470f, 214f)
         friend.setPosition(470f, 250f)
         firstTransformationPending = false
+        chapterEndingPending = false
         theme = ImaginationTheme.REAL
         landmarks.forEach { it.theme = theme }
         friend.theme = theme
@@ -392,6 +437,15 @@ class BackyardGame(context: Context) {
         dialogue = chapterOne.firstTransformationSceneText()
     }
 
+    private fun beginChapterEndingScene() {
+        if (chapterEndingPending || transition.isActive) return
+        player.setPosition(466f, 166f)
+        friend.setPosition(488f, 166f)
+        nearbyInteractable = null
+        chapterEndingPending = true
+        dialogue = chapterOne.returnHomeSceneText()
+    }
+
     private fun startThemeSwitch() {
         if (transition.isActive) return
         dialogue = null
@@ -409,6 +463,11 @@ class BackyardGame(context: Context) {
                 chapterOne.onFantasyEntered()
             } else {
                 friend.setPosition(470f, 250f)
+                if (chapterOne.readyToReturnHome() && !chapterOne.endingComplete()) {
+                    player.setPosition(470f, 214f)
+                    chapterOne.onReturnedHome()
+                    dialogue = "Back in the ordinary backyard, Mia laughs. “Tomorrow, let's make it even bigger.”"
+                }
             }
             eventBus.post(GameEvent.ThemeChanged(theme.name))
             saveGame()
@@ -507,6 +566,8 @@ class BackyardGame(context: Context) {
             nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> when {
                 theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy() -> "ACTION: CHECK FORT"
                 theme == ImaginationTheme.REAL && !chapterOne.hasEnteredFantasy() -> "ACTION: ENTER WITH MIA"
+                theme == ImaginationTheme.FANTASY && chapterOne.readyToReturnHome() &&
+                    !chapterOne.endingComplete() -> "ACTION: RETURN WITH MIA"
                 else -> "ACTION: SWITCH WORLD"
             }
             nearbyInteractable is TreasureChest -> "ACTION: OPEN"
@@ -540,7 +601,7 @@ class BackyardGame(context: Context) {
     private fun drawDebugPanel(canvas: Canvas) {
         paint.color = 0xCC000000.toInt(); canvas.drawRect(6f, 6f, 320f, 80f, paint)
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.LEFT; paint.textSize = 10f
-        canvas.drawText("Backyard Realms Ch.1 M2", 12f, 18f, paint)
+        canvas.drawText("Backyard Realms Ch.1 M3", 12f, 18f, paint)
         canvas.drawText("theme=$theme time=$worldTime", 12f, 30f, paint)
         canvas.drawText("${player.positionText()} hp=${player.health.current}/${player.health.maximum}", 12f, 42f, paint)
         canvas.drawText("equipped=${inventory.equippedItemId ?: "none"} slots=${inventory.allSlots().size}", 12f, 54f, paint)

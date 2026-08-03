@@ -10,7 +10,7 @@ import com.example.backyardrealms.engine.entity.CharacterEntity
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-enum class EnemyState { WANDER, CHASE, HURT, DEFEATED }
+enum class EnemyState { WANDER, CHASE, HURT, STUNNED, DEFEATED }
 
 class YardBlob(
     override val id: String,
@@ -30,6 +30,7 @@ class YardBlob(
     private var wanderTimer = 0f
     private var hurtTimer = 0f
     private var defeatedTimer = 0f
+    private var stunTimer = 0f
     private var lastAttackId = -1
     var state: EnemyState = EnemyState.WANDER
         private set
@@ -43,6 +44,14 @@ class YardBlob(
         if (state == EnemyState.DEFEATED) {
             defeatedTimer -= dt
             if (defeatedTimer <= 0f) respawn()
+            return
+        }
+        if (stunTimer > 0f) {
+            stunTimer = (stunTimer - dt).coerceAtLeast(0f)
+            state = EnemyState.STUNNED
+            velocityX *= 0.78f
+            velocityY *= 0.78f
+            if (stunTimer <= 0f) state = EnemyState.WANDER
             return
         }
         if (hurtTimer > 0f) {
@@ -97,6 +106,16 @@ class YardBlob(
 
     fun forceRespawn() = respawn()
 
+    /** Companion support action: stun without dealing damage. */
+    fun stun(seconds: Float = 0.75f): Boolean {
+        if (!active || state == EnemyState.DEFEATED || state == EnemyState.HURT) return false
+        stunTimer = maxOf(stunTimer, seconds)
+        velocityX *= -0.25f
+        velocityY *= -0.25f
+        state = EnemyState.STUNNED
+        return true
+    }
+
     private fun respawn() {
         body.offsetTo(spawnX, spawnY)
         health.restore()
@@ -104,6 +123,7 @@ class YardBlob(
         state = EnemyState.WANDER
         hurtTimer = 0f
         defeatedTimer = 0f
+        stunTimer = 0f
         velocityX = 0f
         velocityY = 0f
         lastAttackId = -1
@@ -112,7 +132,11 @@ class YardBlob(
     override fun draw(canvas: Canvas) {
         if (!active || state == EnemyState.DEFEATED) return
         val squash = sin(age * 7f) * 1.4f
-        paint.color = if (state == EnemyState.HURT) 0xFFFFE0E0.toInt() else 0xFF9D63D6.toInt()
+        paint.color = when (state) {
+            EnemyState.HURT -> 0xFFFFE0E0.toInt()
+            EnemyState.STUNNED -> 0xFF8ED8FF.toInt()
+            else -> 0xFF9D63D6.toInt()
+        }
         canvas.drawOval(body.left, body.top + squash, body.right, body.bottom - squash, paint)
         paint.color = 0xFFE7C9FF.toInt()
         canvas.drawCircle(body.centerX() - 4f, body.centerY() - 2f, 2f, paint)
