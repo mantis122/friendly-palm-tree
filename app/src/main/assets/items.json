@@ -1,0 +1,35 @@
+[
+  {
+    "id": "stick",
+    "name": "Favorite Stick",
+    "description": "The perfect stick. In another world, it could be a hero's sword.",
+    "maxStack": 1,
+    "equippable": true,
+    "usable": true,
+    "questItem": false,
+    "damage": 1,
+    "iconColor": "#D8B878"
+  },
+  {
+    "id": "summer_berry",
+    "name": "Summer Berry",
+    "description": "A sweet berry from beside the garden fence.",
+    "maxStack": 9,
+    "equippable": false,
+    "usable": true,
+    "questItem": false,
+    "damage": 0,
+    "iconColor": "#C83F5A"
+  },
+  {
+    "id": "brass_key",
+    "name": "Tiny Brass Key",
+    "description": "A small key that looks important, even in the real world.",
+    "maxStack": 1,
+    "equippable": false,
+    "usable": false,
+    "questItem": true,
+    "damage": 0,
+    "iconColor": "#E7C85B"
+  }
+]

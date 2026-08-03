@@ -45,7 +45,7 @@ class Player(
     val isAttacking: Boolean get() = actionTimer > 0f
     val currentAttackId: Int get() = attackId
 
-    fun update(dt: Float, input: InputSnapshot, obstacles: List<RectF>, bounds: RectF) {
+    fun update(dt: Float, input: InputSnapshot, obstacles: List<RectF>, bounds: RectF, canAttack: Boolean = true) {
         invulnerabilityTimer = (invulnerabilityTimer - dt).coerceAtLeast(0f)
         knockbackTimer = (knockbackTimer - dt).coerceAtLeast(0f)
 
@@ -75,7 +75,7 @@ class Player(
         moveAxis(velocityX * dt, 0f, obstacles, bounds)
         moveAxis(0f, velocityY * dt, obstacles, bounds)
 
-        if (input.actionPressed && actionTimer <= 0f && knockbackTimer <= 0f) {
+        if (canAttack && input.actionPressed && actionTimer <= 0f && knockbackTimer <= 0f) {
             actionTimer = ACTION_SECONDS
             attackId++
         }

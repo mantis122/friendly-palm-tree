@@ -48,3 +48,25 @@ The game never mocks imagination or treats it as something the children must aba
 Combat exists inside imagined play first; the ordinary backyard is safe. Engine combat is expressed through reusable health, damage, hitbox, hurtbox, knockback, invulnerability, and defeat concepts. Game-specific weapons and creatures configure those mechanisms rather than replacing them.
 
 Combat must remain forgiving on touch screens: generous attack areas, clear recoil, brief invulnerability after damage, readable health, and restrained enemy speed. A single attack may damage a target at most once, regardless of how many simulation frames overlap.
+
+# Engine 1.0 Decisions
+
+## Stable boundary
+
+The engine exposes reusable timing, rendering, camera, input, collision, entities, events, combat, saving, inventory, quest flags, and item-interaction mechanisms. It must not reference Backyard Realms characters, places, themes, enemies, or story terms.
+
+## Content data
+
+Item definitions live in `app/src/main/assets/items.json`. Game rules decide where items appear and what world targets accept them. Adding ordinary items should not require modifying the inventory engine.
+
+## Equipment
+
+Engine 1.0 intentionally supports one equipped-item slot. Additional slots will only be introduced by a concrete game requirement.
+
+## Quest flags
+
+Flags are stable string identifiers and are serialized as save data. Existing flag identifiers must not be renamed after a public game build without a migration.
+
+## Development rule
+
+Every reusable mechanism must have an immediately playable Backyard Realms use case and a developer test path.

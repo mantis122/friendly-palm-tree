@@ -11,14 +11,15 @@ class TouchControls(private val input: InputState) {
     private val joystickCenterY = GameConfig.LOGICAL_HEIGHT - 66f
     private val joystickRadius = 44f
     private val knobRadius = 19f
-
     private val actionCenterX = GameConfig.LOGICAL_WIDTH - 66f
     private val actionCenterY = GameConfig.LOGICAL_HEIGHT - 62f
     private val actionRadius = 34f
-
     private val developerCenterX = GameConfig.LOGICAL_WIDTH - 30f
     private val developerCenterY = 22f
     private val developerRadius = 18f
+    private val inventoryCenterX = GameConfig.LOGICAL_WIDTH - 76f
+    private val inventoryCenterY = 22f
+    private val inventoryRadius = 18f
 
     private var movePointerId = MotionEvent.INVALID_POINTER_ID
     private var actionPointerId = MotionEvent.INVALID_POINTER_ID
@@ -33,30 +34,26 @@ class TouchControls(private val input: InputState) {
                 val id = event.getPointerId(index)
                 val x = viewport.toLogicalX(event.getX(index))
                 val y = viewport.toLogicalY(event.getY(index))
-
                 when {
-                    insideDeveloper(x, y) -> input.queueDeveloper()
+                    insideCircle(x, y, developerCenterX, developerCenterY, developerRadius) -> input.queueDeveloper()
+                    insideCircle(x, y, inventoryCenterX, inventoryCenterY, inventoryRadius) -> input.queueInventory()
                     x < GameConfig.LOGICAL_WIDTH * 0.5f && movePointerId == MotionEvent.INVALID_POINTER_ID -> {
                         movePointerId = id
                         updateJoystick(x, y)
                     }
-                    insideAction(x, y) && actionPointerId == MotionEvent.INVALID_POINTER_ID -> {
+                    insideCircle(x, y, actionCenterX, actionCenterY, actionRadius) && actionPointerId == MotionEvent.INVALID_POINTER_ID -> {
                         actionPointerId = id
                         actionHeld = true
                         input.queueAction()
                     }
                 }
             }
-
             MotionEvent.ACTION_MOVE -> {
                 for (index in 0 until event.pointerCount) {
                     val id = event.getPointerId(index)
-                    val x = viewport.toLogicalX(event.getX(index))
-                    val y = viewport.toLogicalY(event.getY(index))
-                    if (id == movePointerId) updateJoystick(x, y)
+                    if (id == movePointerId) updateJoystick(viewport.toLogicalX(event.getX(index)), viewport.toLogicalY(event.getY(index)))
                 }
             }
-
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> releasePointer(event.getPointerId(event.actionIndex))
             MotionEvent.ACTION_CANCEL -> reset()
         }
@@ -69,64 +66,40 @@ class TouchControls(private val input: InputState) {
         canvas.drawCircle(joystickCenterX, joystickCenterY, joystickRadius, paint)
         paint.color = 0x99FFFFFF.toInt()
         canvas.drawCircle(knobX, knobY, knobRadius, paint)
-
         paint.color = if (actionHeld) 0xCCF0B040.toInt() else 0x99D08030.toInt()
         canvas.drawCircle(actionCenterX, actionCenterY, actionRadius, paint)
-        paint.color = 0xFFFFFFFF.toInt()
-        paint.textAlign = Paint.Align.CENTER
-        paint.textSize = 13f
+        paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.CENTER; paint.textSize = 13f
         canvas.drawText("ACTION", actionCenterX, actionCenterY + 4f, paint)
+        drawSmallButton(canvas, inventoryCenterX, inventoryCenterY, "BAG")
+        drawSmallButton(canvas, developerCenterX, developerCenterY, "DEV")
+    }
 
-        paint.color = 0xAA222222.toInt()
-        canvas.drawCircle(developerCenterX, developerCenterY, developerRadius, paint)
-        paint.color = 0xFFFFFFFF.toInt()
-        paint.textSize = 9f
-        canvas.drawText("DEV", developerCenterX, developerCenterY + 3f, paint)
+    private fun drawSmallButton(canvas: Canvas, x: Float, y: Float, label: String) {
+        paint.color = 0xAA222222.toInt(); canvas.drawCircle(x, y, 18f, paint)
+        paint.color = 0xFFFFFFFF.toInt(); paint.textSize = 9f; canvas.drawText(label, x, y + 3f, paint)
     }
 
     private fun updateJoystick(x: Float, y: Float) {
-        val dx = x - joystickCenterX
-        val dy = y - joystickCenterY
+        val dx = x - joystickCenterX; val dy = y - joystickCenterY
         val distance = sqrt(dx * dx + dy * dy)
         val amount = if (distance > joystickRadius && distance > 0f) joystickRadius / distance else 1f
-        val limitedX = dx * amount
-        val limitedY = dy * amount
-        knobX = joystickCenterX + limitedX
-        knobY = joystickCenterY + limitedY
+        val limitedX = dx * amount; val limitedY = dy * amount
+        knobX = joystickCenterX + limitedX; knobY = joystickCenterY + limitedY
         input.setMovement(limitedX / joystickRadius, limitedY / joystickRadius)
     }
 
     private fun releasePointer(id: Int) {
-        if (id == movePointerId) {
-            movePointerId = MotionEvent.INVALID_POINTER_ID
-            knobX = joystickCenterX
-            knobY = joystickCenterY
-            input.setMovement(0f, 0f)
-        }
-        if (id == actionPointerId) {
-            actionPointerId = MotionEvent.INVALID_POINTER_ID
-            actionHeld = false
-        }
+        if (id == movePointerId) { movePointerId = MotionEvent.INVALID_POINTER_ID; knobX = joystickCenterX; knobY = joystickCenterY; input.setMovement(0f, 0f) }
+        if (id == actionPointerId) { actionPointerId = MotionEvent.INVALID_POINTER_ID; actionHeld = false }
     }
 
     private fun reset() {
-        movePointerId = MotionEvent.INVALID_POINTER_ID
-        actionPointerId = MotionEvent.INVALID_POINTER_ID
-        knobX = joystickCenterX
-        knobY = joystickCenterY
-        actionHeld = false
-        input.clear()
+        movePointerId = MotionEvent.INVALID_POINTER_ID; actionPointerId = MotionEvent.INVALID_POINTER_ID
+        knobX = joystickCenterX; knobY = joystickCenterY; actionHeld = false; input.clear()
     }
 
-    private fun insideAction(x: Float, y: Float): Boolean {
-        val dx = x - actionCenterX
-        val dy = y - actionCenterY
-        return dx * dx + dy * dy <= actionRadius * actionRadius
-    }
-
-    private fun insideDeveloper(x: Float, y: Float): Boolean {
-        val dx = x - developerCenterX
-        val dy = y - developerCenterY
-        return dx * dx + dy * dy <= developerRadius * developerRadius
+    private fun insideCircle(x: Float, y: Float, cx: Float, cy: Float, radius: Float): Boolean {
+        val dx = x - cx; val dy = y - cy
+        return dx * dx + dy * dy <= radius * radius
     }
 }

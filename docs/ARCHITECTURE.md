@@ -28,3 +28,12 @@
 ## Next architectural extraction
 
 After the interaction and camera behavior are validated on-device, the next milestone should add generic entity, animation-state, combat hitbox/hurtbox, and developer-menu systems. The imagination theme must remain game-specific while using reusable engine hooks.
+
+## Engine 1.0 modules
+
+- `engine/inventory`: item definitions, JSON catalog, inventory slots, equipment, and item-use contracts.
+- `engine/quest`: generic persistent string flags.
+- `game/items`: Backyard-specific pickups, chest content, and item/target rules.
+- `assets/items.json`: data-driven item content.
+
+The save layer persists serialized inventories and flags without importing game-specific item classes.
