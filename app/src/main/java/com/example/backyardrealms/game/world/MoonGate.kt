@@ -6,7 +6,7 @@ import android.graphics.RectF
 import com.example.backyardrealms.engine.world.Interactable
 
 class MoonGate(
-    override val id: String,
+    val id: String,
     val bounds: RectF
 ) : Interactable {
     var unlocked: Boolean = false
@@ -29,12 +29,15 @@ class MoonGate(
             paint.style = Paint.Style.FILL
             return
         }
+
         paint.color = 0xFF28324C.toInt()
         canvas.drawRect(bounds, paint)
+
         paint.color = 0xFF8FA7D8.toInt()
         for (x in listOf(bounds.left + 8f, bounds.centerX(), bounds.right - 8f)) {
             canvas.drawRect(x - 2f, bounds.top, x + 2f, bounds.bottom, paint)
         }
+
         paint.color = 0xFFE7C85B.toInt()
         canvas.drawCircle(bounds.centerX(), bounds.centerY(), 4f, paint)
     }
