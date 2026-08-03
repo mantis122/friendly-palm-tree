@@ -1,30 +1,30 @@
-# Architecture Boundary
+# Architecture — Engine 0.2
 
-## Engine-owned responsibilities
+## Reusable engine layer
 
-- Timing and lifecycle
-- Logical viewport and rendering surface
-- Input abstraction
-- Collision primitives
-- Entity lifecycle
-- Animation playback
-- Audio services
-- Scene transitions
-- Asset/data loading
-- Save infrastructure
-- Diagnostics
+- `GameSurfaceView`: Android lifecycle, fixed update loop, frame drawing
+- `Viewport`: logical-resolution scaling and touch-coordinate conversion
+- `InputState` / `TouchControls`: platform input abstraction
+- `Camera2D`: world-space camera follow and visible viewport
+- `SpriteSheet`: PNG frame extraction and rendering
+- `AnimatedSprite`: reusable frame timing
+- `Interactable`: minimal interaction extension point
 
-## Game-owned responsibilities
+## Backyard Realms game layer
 
-- Backyard maps and landmarks
-- Player rules
-- Friends and imagination themes
-- Weapons and items
-- Enemy definitions
-- Dialogue and quests
-- Story flags
-- Art and audio content
+- `BackyardGame`: current world composition and game-specific rules
+- `Player`: temporary Backyard player implementation
+- `FriendNpc`: first story-facing NPC
+- `Landmark`: backyard obstacle and interaction content
 
-## Reuse test
+## Current deliberate limitations
 
-The engine is reusable when a second top-down action-adventure can replace the maps, rules, entities, UI style, story, and assets without rewriting timing, rendering, input, collision, animation, audio, scene, or save infrastructure.
+- The map is still authored in Kotlin rather than loaded from data.
+- Dialogue is one line and not yet data-driven.
+- The player sprite is an intentionally simple placeholder.
+- No enemies, damage, health, inventory, room transitions, saving, or audio yet.
+- Debug overlays are always enabled in this development build.
+
+## Next architectural extraction
+
+After the interaction and camera behavior are validated on-device, the next milestone should add generic entity, animation-state, combat hitbox/hurtbox, and developer-menu systems. The imagination theme must remain game-specific while using reusable engine hooks.

@@ -1,62 +1,37 @@
-# Backyard Realms — Starter Project
+# Backyard Realms — Backyard Engine 0.2
 
-This is the first runnable milestone for an Android-first, top-down 2D action-adventure engine and game.
+A phone-first Android action-RPG prototype and purpose-built reusable 2D engine.
 
-## Included
+## Milestone 0.2 features
 
-- Native Android/Kotlin project
-- Landscape immersive display
-- Dedicated `SurfaceView` game loop
-- Fixed 60 Hz simulation updates
-- Logical 480 × 270 game resolution with letterboxing
-- Multitouch virtual joystick and action button
-- Placeholder backyard world
-- Player movement
-- Rectangle collision against landmarks and yard boundaries
-- Temporary stick-swing action
-- Debug overlay
-- GitHub Actions APK build
+- Fixed 60 Hz update loop and scaled 480×270 logical display
+- Large 960×540 scrolling backyard
+- Smooth camera with a small dead zone
+- Accelerated/decelerated analog movement with normalized diagonals
+- Axis-separated collision resolution
+- PNG sprite-sheet loading and reusable frame animation classes
+- Directional three-phase stick swing presentation
+- Reusable interactable interface
+- First friend NPC near the fort
+- Context-sensitive ACTION behavior and dialogue panel
+- Collision, interaction, attack, position, and camera debug overlays
+- Touch joystick and action button
 
-## Current source organization
+## Build
 
-```text
-com.example.backyardrealms/
-├── MainActivity.kt
-├── engine/
-│   ├── GameConfig.kt
-│   ├── GameSurfaceView.kt
-│   ├── InputState.kt
-│   ├── TouchControls.kt
-│   └── Viewport.kt
-└── game/
-    ├── BackyardGame.kt
-    └── Player.kt
-```
+Push the repository to GitHub and run `.github/workflows/android-build.yml`. Download the `BackyardRealms-debug` artifact and install `app-debug.apk`.
 
-The `engine` package must remain unaware of Backyard Realms characters, story, and content. The `game` package uses engine services to implement this particular game.
+## Test checklist
 
-## Build through GitHub Actions
+1. Walk in every direction and verify diagonal movement is not faster.
+2. Release the joystick and verify the player decelerates quickly rather than stopping harshly.
+3. Walk around the larger yard and verify the camera follows smoothly.
+4. Verify the player cannot enter the fort, tree, shed, garden, sandbox, or porch.
+5. Stand near the friend or a landmark and press ACTION to open dialogue.
+6. Press ACTION again to close dialogue.
+7. Away from interactable objects, press ACTION and verify the stick swings.
+8. Verify yellow collision outlines, cyan interaction outline, and red attack box appear correctly.
 
-1. Create a GitHub repository.
-2. Upload the contents of this folder to the repository root.
-3. Commit and push.
-4. Open **Actions → Build Android APK**.
-5. Run the workflow, or let it run automatically after the push.
-6. Download the `BackyardRealms-debug` artifact.
-7. Extract and install `app-debug.apk` on the phone.
+## Architecture
 
-## Controls
-
-- Touch and drag on the left half: move.
-- Tap the round ACTION button: swing the placeholder stick.
-
-## Important scope rule
-
-Only add an engine feature when a playable game requirement needs it. Do not build a general-purpose editor or engine subsystem speculatively.
-
-## Suggested next milestone
-
-1. Replace the simple world drawing with a tile-grid renderer.
-2. Add a reusable `Entity` interface and world entity collection.
-3. Add one imaginary enemy with health, hitbox, hurtbox, and knockback.
-4. Add an in-app diagnostics screen for phone-only testing.
+Reusable systems remain under `engine/`. Backyard-specific content remains under `game/`. See `docs/ARCHITECTURE.md`.

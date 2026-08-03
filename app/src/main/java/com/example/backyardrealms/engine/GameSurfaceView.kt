@@ -13,7 +13,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     private val input = InputState()
     private val viewport = Viewport()
     private val controls = TouchControls(input)
-    private val game = BackyardGame()
+    private val game = BackyardGame(context.applicationContext)
 
     @Volatile private var running = false
     @Volatile private var surfaceReady = false
