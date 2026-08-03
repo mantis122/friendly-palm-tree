@@ -2,7 +2,6 @@ package com.example.backyardrealms.engine
 
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.RectF
 import android.view.MotionEvent
 import kotlin.math.sqrt
 
@@ -16,6 +15,10 @@ class TouchControls(private val input: InputState) {
     private val actionCenterX = GameConfig.LOGICAL_WIDTH - 66f
     private val actionCenterY = GameConfig.LOGICAL_HEIGHT - 62f
     private val actionRadius = 34f
+
+    private val developerCenterX = GameConfig.LOGICAL_WIDTH - 30f
+    private val developerCenterY = 22f
+    private val developerRadius = 18f
 
     private var movePointerId = MotionEvent.INVALID_POINTER_ID
     private var actionPointerId = MotionEvent.INVALID_POINTER_ID
@@ -31,13 +34,17 @@ class TouchControls(private val input: InputState) {
                 val x = viewport.toLogicalX(event.getX(index))
                 val y = viewport.toLogicalY(event.getY(index))
 
-                if (x < GameConfig.LOGICAL_WIDTH * 0.5f && movePointerId == MotionEvent.INVALID_POINTER_ID) {
-                    movePointerId = id
-                    updateJoystick(x, y)
-                } else if (insideAction(x, y) && actionPointerId == MotionEvent.INVALID_POINTER_ID) {
-                    actionPointerId = id
-                    actionHeld = true
-                    input.queueAction()
+                when {
+                    insideDeveloper(x, y) -> input.queueDeveloper()
+                    x < GameConfig.LOGICAL_WIDTH * 0.5f && movePointerId == MotionEvent.INVALID_POINTER_ID -> {
+                        movePointerId = id
+                        updateJoystick(x, y)
+                    }
+                    insideAction(x, y) && actionPointerId == MotionEvent.INVALID_POINTER_ID -> {
+                        actionPointerId = id
+                        actionHeld = true
+                        input.queueAction()
+                    }
                 }
             }
 
@@ -50,10 +57,7 @@ class TouchControls(private val input: InputState) {
                 }
             }
 
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                releasePointer(event.getPointerId(event.actionIndex))
-            }
-
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> releasePointer(event.getPointerId(event.actionIndex))
             MotionEvent.ACTION_CANCEL -> reset()
         }
         return true
@@ -72,6 +76,12 @@ class TouchControls(private val input: InputState) {
         paint.textAlign = Paint.Align.CENTER
         paint.textSize = 13f
         canvas.drawText("ACTION", actionCenterX, actionCenterY + 4f, paint)
+
+        paint.color = 0xAA222222.toInt()
+        canvas.drawCircle(developerCenterX, developerCenterY, developerRadius, paint)
+        paint.color = 0xFFFFFFFF.toInt()
+        paint.textSize = 9f
+        canvas.drawText("DEV", developerCenterX, developerCenterY + 3f, paint)
     }
 
     private fun updateJoystick(x: Float, y: Float) {
@@ -112,5 +122,11 @@ class TouchControls(private val input: InputState) {
         val dx = x - actionCenterX
         val dy = y - actionCenterY
         return dx * dx + dy * dy <= actionRadius * actionRadius
+    }
+
+    private fun insideDeveloper(x: Float, y: Float): Boolean {
+        val dx = x - developerCenterX
+        val dy = y - developerCenterY
+        return dx * dx + dy * dy <= developerRadius * developerRadius
     }
 }

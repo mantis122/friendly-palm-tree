@@ -5,13 +5,15 @@ import kotlin.math.sqrt
 data class InputSnapshot(
     val moveX: Float,
     val moveY: Float,
-    val actionPressed: Boolean
+    val actionPressed: Boolean,
+    val developerPressed: Boolean
 )
 
 class InputState {
     private var moveX = 0f
     private var moveY = 0f
     private var actionQueued = false
+    private var developerQueued = false
 
     @Synchronized
     fun setMovement(x: Float, y: Float) {
@@ -31,9 +33,15 @@ class InputState {
     }
 
     @Synchronized
+    fun queueDeveloper() {
+        developerQueued = true
+    }
+
+    @Synchronized
     fun snapshot(): InputSnapshot {
-        val result = InputSnapshot(moveX, moveY, actionQueued)
+        val result = InputSnapshot(moveX, moveY, actionQueued, developerQueued)
         actionQueued = false
+        developerQueued = false
         return result
     }
 
@@ -42,5 +50,6 @@ class InputState {
         moveX = 0f
         moveY = 0f
         actionQueued = false
+        developerQueued = false
     }
 }

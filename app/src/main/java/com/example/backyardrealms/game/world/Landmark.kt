@@ -4,26 +4,29 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import com.example.backyardrealms.engine.world.Interactable
+import com.example.backyardrealms.game.theme.ImaginationTheme
+
+data class LandmarkAppearance(val color: Int, val label: String, val message: String)
 
 class Landmark(
+    val id: String,
     val collisionBounds: RectF,
-    private val color: Int,
-    private val label: String,
-    private val message: String
+    private val real: LandmarkAppearance,
+    private val fantasy: LandmarkAppearance
 ) : Interactable {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
+    var theme: ImaginationTheme = ImaginationTheme.REAL
     override val interactionBounds: RectF = RectF(collisionBounds).apply { inset(-15f, -15f) }
-
-    override fun interactionText(): String = message
-
+    private fun appearance() = if (theme == ImaginationTheme.REAL) real else fantasy
+    override fun interactionText(): String = appearance().message
     fun draw(canvas: Canvas) {
+        val a = appearance()
         paint.style = Paint.Style.FILL
-        paint.color = color
+        paint.color = a.color
         canvas.drawRect(collisionBounds, paint)
         paint.color = 0xDDFFFFFF.toInt()
         paint.textAlign = Paint.Align.CENTER
         paint.textSize = 10f
-        canvas.drawText(label, collisionBounds.centerX(), collisionBounds.centerY() + 3f, paint)
+        canvas.drawText(a.label, collisionBounds.centerX(), collisionBounds.centerY() + 3f, paint)
     }
 }

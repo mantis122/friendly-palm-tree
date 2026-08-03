@@ -1,37 +1,24 @@
-# Backyard Realms — Backyard Engine 0.2
+# Backyard Realms — Engine 0.3
 
-A phone-first Android action-RPG prototype and purpose-built reusable 2D engine.
-
-## Milestone 0.2 features
-
-- Fixed 60 Hz update loop and scaled 480×270 logical display
-- Large 960×540 scrolling backyard
-- Smooth camera with a small dead zone
-- Accelerated/decelerated analog movement with normalized diagonals
-- Axis-separated collision resolution
-- PNG sprite-sheet loading and reusable frame animation classes
-- Directional three-phase stick swing presentation
-- Reusable interactable interface
-- First friend NPC near the fort
-- Context-sensitive ACTION behavior and dialogue panel
-- Collision, interaction, attack, position, and camera debug overlays
-- Touch joystick and action button
-
-## Build
-
-Push the repository to GitHub and run `.github/workflows/android-build.yml`. Download the `BackyardRealms-debug` artifact and install `app-debug.apk`.
+This milestone introduces the game’s defining imagination-switching system.
 
 ## Test checklist
 
-1. Walk in every direction and verify diagonal movement is not faster.
-2. Release the joystick and verify the player decelerates quickly rather than stopping harshly.
-3. Walk around the larger yard and verify the camera follows smoothly.
-4. Verify the player cannot enter the fort, tree, shed, garden, sandbox, or porch.
-5. Stand near the friend or a landmark and press ACTION to open dialogue.
-6. Press ACTION again to close dialogue.
-7. Away from interactable objects, press ACTION and verify the stick swings.
-8. Verify yellow collision outlines, cyan interaction outline, and red attack box appear correctly.
+1. Confirm movement, camera, collision, interaction, and stick attacks still work.
+2. Walk to the fort and press ACTION. The screen should fade to black and return in the Fantasy theme.
+3. Verify player position, camera position, and collision remain unchanged across the switch.
+4. Verify the ground, paths, landmarks, labels, Mia, and interaction text change.
+5. Use the fort again to return to the Real theme.
+6. Tap DEV in the upper-right. Movement should pause and the developer panel should open.
+7. Press ACTION while the developer panel is open to force a theme switch.
+8. Tap DEV again to close the panel.
+9. Confirm no input gets stuck after multitouch or opening/closing the developer panel.
 
-## Architecture
+## Architecture added
 
-Reusable systems remain under `engine/`. Backyard-specific content remains under `game/`. See `docs/ARCHITECTURE.md`.
+- `ImaginationTheme`: reusable theme identity.
+- `ThemeTransition`: reusable fade-out/midpoint/fade-in transition.
+- Theme-aware landmarks and NPC presentation.
+- Developer input command and overlay.
+
+The physical backyard, collision geometry, player state, and camera remain stable while the active interpretation changes.
