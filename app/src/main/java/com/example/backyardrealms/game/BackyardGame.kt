@@ -65,6 +65,7 @@ class BackyardGame(context: Context) {
     private var saveTimer = 0f
     private var verticalInputLatched = false
     private var horizontalInputLatched = false
+    private var firstTransformationPending = false
 
     private fun a(color: Int, label: String, message: String) = LandmarkAppearance(color, label, message)
     private val landmarks = listOf(
@@ -180,14 +181,24 @@ class BackyardGame(context: Context) {
         collectTouchingPickups()
         nearbyInteractable = findNearestInteractable()
         when {
-            input.actionPressed && dialogue != null -> dialogue = null
+            input.actionPressed && dialogue != null -> {
+                dialogue = null
+                if (firstTransformationPending) {
+                    firstTransformationPending = false
+                    startThemeSwitch()
+                }
+            }
             input.actionPressed && nearbyInteractable is TreasureChest -> openChest(nearbyInteractable as TreasureChest)
             input.actionPressed && nearbyInteractable is MoonGate -> interactWithGate()
             input.actionPressed && nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> {
-                if (theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy()) {
-                    dialogue = chapterOne.fortBlockedMessage()
-                } else {
-                    startThemeSwitch()
+                when {
+                    theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy() -> {
+                        dialogue = chapterOne.fortBlockedMessage()
+                    }
+                    theme == ImaginationTheme.REAL && !chapterOne.hasEnteredFantasy() -> {
+                        beginFirstTransformationScene()
+                    }
+                    else -> startThemeSwitch()
                 }
             }
             input.actionPressed && nearbyInteractable != null -> interactWith(nearbyInteractable!!)
@@ -339,6 +350,8 @@ class BackyardGame(context: Context) {
         moonGate.unlocked = false
         chapterOne.reset()
         player.setPosition(470f, 214f)
+        friend.setPosition(470f, 250f)
+        firstTransformationPending = false
         theme = ImaginationTheme.REAL
         landmarks.forEach { it.theme = theme }
         friend.theme = theme
@@ -370,6 +383,15 @@ class BackyardGame(context: Context) {
         pickups.filter { it.collected }.joinToString(",") { it.id }
     ))
 
+    private fun beginFirstTransformationScene() {
+        if (firstTransformationPending || transition.isActive) return
+        player.setPosition(466f, 166f)
+        friend.setPosition(488f, 166f)
+        nearbyInteractable = null
+        firstTransformationPending = true
+        dialogue = chapterOne.firstTransformationSceneText()
+    }
+
     private fun startThemeSwitch() {
         if (transition.isActive) return
         dialogue = null
@@ -378,9 +400,15 @@ class BackyardGame(context: Context) {
             landmarks.forEach { it.theme = theme }
             friend.theme = theme
             if (theme == ImaginationTheme.FANTASY) {
+                if (!chapterOne.hasEnteredFantasy()) {
+                    player.setPosition(470f, 214f)
+                    friend.setPosition(470f, 250f)
+                }
                 enemies.forEach { it.forceRespawn() }
                 questFlags.set("ENTERED_FANTASY")
                 chapterOne.onFantasyEntered()
+            } else {
+                friend.setPosition(470f, 250f)
             }
             eventBus.post(GameEvent.ThemeChanged(theme.name))
             saveGame()
@@ -475,7 +503,15 @@ class BackyardGame(context: Context) {
         if (dialogue != null || nearbyInteractable == null || developerOpen || inventoryOpen) return
         paint.color = 0xCC000000.toInt(); canvas.drawRoundRect(170f, 222f, 310f, 250f, 6f, 6f, paint)
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.CENTER; paint.textSize = 11f
-        val text = when { nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> if (theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy()) "ACTION: CHECK FORT" else "ACTION: SWITCH WORLD"; nearbyInteractable is TreasureChest -> "ACTION: OPEN"; else -> "ACTION: INTERACT" }
+        val text = when {
+            nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> when {
+                theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy() -> "ACTION: CHECK FORT"
+                theme == ImaginationTheme.REAL && !chapterOne.hasEnteredFantasy() -> "ACTION: ENTER WITH MIA"
+                else -> "ACTION: SWITCH WORLD"
+            }
+            nearbyInteractable is TreasureChest -> "ACTION: OPEN"
+            else -> "ACTION: INTERACT"
+        }
         canvas.drawText(text, 240f, 240f, paint)
     }
 

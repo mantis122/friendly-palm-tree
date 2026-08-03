@@ -23,7 +23,13 @@ class FriendNpc(x: Float, y: Float) : CharacterEntity(), Interactable {
         }
     }
     var theme: ImaginationTheme = ImaginationTheme.REAL
-    override val interactionBounds: RectF = RectF(body).apply { inset(-22f, -22f) }
+    override val interactionBounds: RectF
+        get() = RectF(body).apply { inset(-22f, -22f) }
+
+    fun setPosition(x: Float, y: Float) {
+        body.offsetTo(x, y)
+    }
+
     override fun interactionText(): String = if (theme == ImaginationTheme.REAL) "Want to play? Meet me inside the fort!" else "Sir Mia says the Moon Goblins stole the yard's crown!"
     override fun update(dt: Float) = idleBehavior.update(this, dt)
     override fun draw(canvas: Canvas) {

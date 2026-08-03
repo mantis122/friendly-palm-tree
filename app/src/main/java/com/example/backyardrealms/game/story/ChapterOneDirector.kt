@@ -29,7 +29,7 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         !flags.has(TALKED_TO_MIA) -> "Talk to Mia near the fort."
         !flags.has(FOUND_STICK) -> "Find your favorite stick beneath the old tree."
         !flags.has(MIA_APPROVED_STICK) -> "Show Mia that you found the stick."
-        !flags.has(ENTERED_FANTASY) -> "Meet Mia at the fort and begin the game."
+        !flags.has(ENTERED_FANTASY) -> "Meet Mia at the fort and climb inside together."
         theme == ImaginationTheme.FANTASY && !flags.has(DEFEATED_MOON_BLOB) -> "Defeat the Moon Blob."
         flags.has(DEFEATED_MOON_BLOB) && !flags.has(FIRST_TRIAL_COMPLETE) -> "Talk to Sir Mia."
         !flags.has(SIGIL_QUEST_ACCEPTED) -> "Ask Sir Mia what happened."
@@ -60,20 +60,30 @@ class ChapterOneDirector(private val flags: QuestFlags) {
             }
         }
         return when {
-            !flags.has(TALKED_TO_MIA) -> { flags.set(TALKED_TO_MIA); "Come on! I thought we were going to play today. Your favorite stick is by the old tree." }
-            !flags.has(FOUND_STICK) -> "Your stick should still be beneath the old tree. I'll wait here."
-            !flags.has(MIA_APPROVED_STICK) -> { flags.set(MIA_APPROVED_STICK); "Perfect! That's definitely a legendary sword. Meet me at the fort!" }
-            !flags.has(ENTERED_FANTASY) -> "Ready? Use the fort and we'll start the adventure."
+            !flags.has(TALKED_TO_MIA) -> {
+                flags.set(TALKED_TO_MIA)
+                "You're not seriously going to fight Moon Goblins without your favorite stick. Didn't you leave it by the old tree again?"
+            }
+            !flags.has(FOUND_STICK) -> "It should still be beneath the old tree. I'll meet you by the fort when you find it."
+            !flags.has(MIA_APPROVED_STICK) -> {
+                flags.set(MIA_APPROVED_STICK)
+                "There it is! Okay, now that's a proper legendary sword. Come on—let's get inside the fort."
+            }
+            !flags.has(ENTERED_FANTASY) -> "Ready? Climb into the fort with me. We have to decide what we're playing first."
             else -> "Want to visit the Moon Kingdom again?"
         }
     }
 
     fun onStickCollected() { flags.set(FOUND_STICK) }
     fun canBeginFantasy(): Boolean = flags.has(MIA_APPROVED_STICK) || flags.has(ENTERED_FANTASY)
+    fun hasEnteredFantasy(): Boolean = flags.has(ENTERED_FANTASY)
+
+    fun firstTransformationSceneText(): String =
+        "Mia crawls into the fort beside you. ‘Okay... this time, we're knights of the Moon Kingdom!’"
     fun fortBlockedMessage(): String = when {
-        !flags.has(TALKED_TO_MIA) -> "Mia is waiting outside. You should talk to her first."
-        !flags.has(FOUND_STICK) -> "You promised to find your favorite stick first."
-        else -> "Show Mia the stick before you begin."
+        !flags.has(TALKED_TO_MIA) -> "The fort is quiet. Mia is waiting outside—you should talk to her first."
+        !flags.has(FOUND_STICK) -> "You should find your favorite stick before starting the game."
+        else -> "Mia wants to see the stick before you both climb inside."
     }
     fun onFantasyEntered() {
         if (!flags.has(ENTERED_FANTASY)) { flags.set(ENTERED_FANTASY); showBanner("THE MOON KINGDOM", "Where the backyard becomes a realm", 3.4f) }
