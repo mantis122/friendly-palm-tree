@@ -53,6 +53,8 @@ class BackyardGame(context: Context) {
     private val transition = ThemeTransition()
     private var developerOpen = false
     private var inventoryOpen = false
+    private var inventoryPage = 0
+    private var inventoryInputLatched = false
     private var saveTimer = 0f
     private var verticalInputLatched = false
     private var horizontalInputLatched = false
@@ -122,6 +124,18 @@ class BackyardGame(context: Context) {
         }
         if (inventoryOpen) {
             if (input.actionPressed) inventoryOpen = false
+            val pageCount = kotlin.math.max(1, (inventory.allSlots().size + 2) / 3)
+            if (kotlin.math.abs(input.moveY) > 0.7f && !inventoryInputLatched) {
+                inventoryPage = if (input.moveY < 0f) {
+                    (inventoryPage - 1 + pageCount) % pageCount
+                } else {
+                    (inventoryPage + 1) % pageCount
+                }
+                inventoryInputLatched = true
+            } else if (kotlin.math.abs(input.moveY) < 0.3f) {
+                inventoryInputLatched = false
+            }
+            inventoryPage = inventoryPage.coerceIn(0, pageCount - 1)
             camera.follow(player.centerX, player.centerY, worldBounds, dt)
             return
         }
@@ -376,22 +390,76 @@ class BackyardGame(context: Context) {
     }
 
     private fun drawInventoryPanel(canvas: Canvas) {
-        paint.color = 0xF0181818.toInt(); canvas.drawRoundRect(52f, 30f, 428f, 242f, 12f, 12f, paint)
-        paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.CENTER; paint.textSize = 18f; canvas.drawText("BACKPACK", 240f, 57f, paint)
+        paint.color = 0xF0181818.toInt()
+        canvas.drawRoundRect(52f, 24f, 428f, 248f, 12f, 12f, paint)
+        paint.color = 0xFFFFFFFF.toInt()
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 18f
+        canvas.drawText("BACKPACK", 240f, 49f, paint)
+
         val slots = inventory.allSlots()
-        if (slots.isEmpty()) { paint.textSize = 12f; canvas.drawText("Your backpack is empty.", 240f, 132f, paint) }
-        slots.forEachIndexed { index, slot ->
-            val definition = itemCatalog[slot.itemId] ?: return@forEachIndexed
-            val row = index / 2; val column = index % 2
-            val left = 72f + column * 180f; val top = 76f + row * 42f
-            paint.color = 0xFF333333.toInt(); canvas.drawRoundRect(left, top, left + 160f, top + 34f, 6f, 6f, paint)
-            paint.color = definition.iconColor; canvas.drawRoundRect(left + 7f, top + 7f, left + 27f, top + 27f, 4f, 4f, paint)
-            paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.LEFT; paint.textSize = 10f
-            val marker = if (inventory.equippedItemId == slot.itemId) " [E]" else ""
-            canvas.drawText("${definition.name}$marker", left + 34f, top + 14f, paint)
-            paint.textSize = 9f; canvas.drawText("x${slot.quantity}  ${definition.description.take(24)}", left + 34f, top + 27f, paint)
+        val itemsPerPage = 3
+        val pageCount = kotlin.math.max(1, (slots.size + itemsPerPage - 1) / itemsPerPage)
+        inventoryPage = inventoryPage.coerceIn(0, pageCount - 1)
+        val visibleSlots = slots.drop(inventoryPage * itemsPerPage).take(itemsPerPage)
+
+        if (slots.isEmpty()) {
+            paint.textSize = 12f
+            canvas.drawText("Your backpack is empty.", 240f, 132f, paint)
         }
-        paint.textAlign = Paint.Align.CENTER; paint.textSize = 9f; canvas.drawText("BAG or ACTION: close", 240f, 232f, paint)
+
+        visibleSlots.forEachIndexed { index, slot ->
+            val definition = itemCatalog[slot.itemId] ?: return@forEachIndexed
+            val left = 70f
+            val top = 62f + index * 51f
+            val right = 410f
+            val bottom = top + 44f
+
+            paint.color = 0xFF333333.toInt()
+            canvas.drawRoundRect(left, top, right, bottom, 7f, 7f, paint)
+            paint.color = definition.iconColor
+            canvas.drawRoundRect(left + 8f, top + 8f, left + 34f, top + 34f, 4f, 4f, paint)
+
+            paint.color = 0xFFFFFFFF.toInt()
+            paint.textAlign = Paint.Align.LEFT
+            paint.textSize = 10f
+            val marker = if (inventory.equippedItemId == slot.itemId) " [E]" else ""
+            canvas.drawText("${definition.name}$marker   x${slot.quantity}", left + 44f, top + 14f, paint)
+
+            paint.textSize = 8.5f
+            val descriptionLines = wrapText(definition.description, 52, 2)
+            descriptionLines.forEachIndexed { lineIndex, line ->
+                canvas.drawText(line, left + 44f, top + 27f + lineIndex * 10f, paint)
+            }
+        }
+
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 8.5f
+        if (pageCount > 1) {
+            canvas.drawText("Joystick up/down: page  ${inventoryPage + 1}/$pageCount", 240f, 224f, paint)
+        }
+        canvas.drawText("BAG or ACTION: close", 240f, 239f, paint)
+    }
+
+    private fun wrapText(text: String, maxCharacters: Int, maxLines: Int): List<String> {
+        if (text.isBlank()) return emptyList()
+        val words = text.trim().split(Regex("\\s+"))
+        val lines = mutableListOf<String>()
+        var current = StringBuilder()
+
+        for (word in words) {
+            val candidateLength = if (current.isEmpty()) word.length else current.length + 1 + word.length
+            if (candidateLength <= maxCharacters) {
+                if (current.isNotEmpty()) current.append(' ')
+                current.append(word)
+            } else {
+                if (current.isNotEmpty()) lines += current.toString()
+                current = StringBuilder(word)
+                if (lines.size == maxLines - 1) break
+            }
+        }
+        if (lines.size < maxLines && current.isNotEmpty()) lines += current.toString()
+        return lines.take(maxLines)
     }
 
     private fun drawDeveloperPanel(canvas: Canvas) {

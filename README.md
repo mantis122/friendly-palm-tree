@@ -1,4 +1,4 @@
-# Backyard Realms — Backyard Engine 1.0
+# Backyard Realms — Backyard Engine 1.0.1
 
 This is the first stable, reusable release of the Android-first custom action-RPG engine. It retains every verified Engine 0.5 system and adds the complete inventory/world-interaction milestone that begins the transition into Chapter 1 development.
 
@@ -82,3 +82,11 @@ Reusable mechanisms live under `engine/`; Backyard-specific content and rules li
 ## Next milestone
 
 **Backyard Realms — Chapter 1, Milestone 1:** opening sequence, objective progression, guided Mia dialogue, waking in the fort, finding the stick, returning to Mia, and the first authored transformation into Fantasy.
+
+
+## 1.0.1 backpack readability fix
+
+- Inventory uses full-width cards.
+- Item descriptions wrap to two readable lines instead of clipping.
+- Backpack pages hold three items each.
+- Use joystick up/down to move between pages when more than three item stacks exist.
