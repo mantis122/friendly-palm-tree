@@ -685,8 +685,41 @@ class BackyardGame(context: Context) {
         }
     }
 
-    private fun findNearestInteractable(): Interactable? = activeInteractables().firstOrNull {
-        (it !is MoonGate || theme == ImaginationTheme.FANTASY) && RectF.intersects(player.collisionBounds, it.interactionBounds)
+    private fun findNearestInteractable(): Interactable? {
+        return activeInteractables()
+            .asSequence()
+            .filter {
+                (it !is MoonGate || theme == ImaginationTheme.FANTASY) &&
+                    RectF.intersects(player.collisionBounds, it.interactionBounds)
+            }
+            .minWithOrNull(
+                compareBy<Interactable>(
+                    { interactionPriority(it) },
+                    {
+                        val bounds = it.interactionBounds
+                        val dx = bounds.centerX() - player.centerX
+                        val dy = bounds.centerY() - player.centerY
+                        dx * dx + dy * dy
+                    }
+                )
+            )
+    }
+
+    /**
+     * Smaller values win when multiple interaction zones overlap.
+     *
+     * Large landmarks deliberately have generous interaction bounds, so a
+     * doorway, gate, chest, reward, or NPC inside that area must take
+     * precedence over the landmark itself.
+     */
+    private fun interactionPriority(target: Interactable): Int = when (target) {
+        is RoomPortal -> 0
+        is MoonGate -> 1
+        is TreasureChest -> 2
+        is DungeonReward -> 3
+        is FriendNpc -> 4
+        is Landmark -> 10
+        else -> 5
     }
 
     private fun drawGround(canvas: Canvas) {
