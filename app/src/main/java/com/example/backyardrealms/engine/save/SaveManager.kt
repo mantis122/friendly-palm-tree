@@ -13,7 +13,8 @@ data class GameSave(
     val equippedItemId: String?,
     val questFlags: String,
     val openedChests: String,
-    val collectedPickups: String
+    val collectedPickups: String,
+    val roomId: String
 )
 
 class SaveManager(context: Context) {
@@ -27,7 +28,8 @@ class SaveManager(context: Context) {
         prefs.getString("equipped_item", null),
         prefs.getString("quest_flags", "") ?: "",
         prefs.getString("opened_chests", "") ?: "",
-        prefs.getString("collected_pickups", "") ?: ""
+        prefs.getString("collected_pickups", "") ?: "",
+        prefs.getString("room_id", "BACKYARD") ?: "BACKYARD"
     )
 
     fun save(save: GameSave) {
@@ -36,6 +38,7 @@ class SaveManager(context: Context) {
             .putString("theme", save.theme.name).putString("world_time", save.worldTime.name)
             .putString("inventory", save.inventory).putString("equipped_item", save.equippedItemId)
             .putString("quest_flags", save.questFlags).putString("opened_chests", save.openedChests)
-            .putString("collected_pickups", save.collectedPickups).apply()
+            .putString("collected_pickups", save.collectedPickups)
+            .putString("room_id", save.roomId).apply()
     }
 }

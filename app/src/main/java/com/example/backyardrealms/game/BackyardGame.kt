@@ -23,6 +23,7 @@ import com.example.backyardrealms.engine.time.WorldTime
 import com.example.backyardrealms.engine.world.Interactable
 import com.example.backyardrealms.game.ambient.AmbientParticle
 import com.example.backyardrealms.game.enemy.YardBlob
+import com.example.backyardrealms.game.enemy.GoblinScout
 import com.example.backyardrealms.game.items.TreasureChest
 import com.example.backyardrealms.game.items.BackyardItemInteractions
 import com.example.backyardrealms.game.items.WorldPickup
@@ -32,11 +33,17 @@ import com.example.backyardrealms.game.theme.ThemeTransition
 import com.example.backyardrealms.game.world.Landmark
 import com.example.backyardrealms.game.world.LandmarkAppearance
 import com.example.backyardrealms.game.world.MoonGate
+import com.example.backyardrealms.game.world.RoomId
+import com.example.backyardrealms.game.world.RoomPortal
+import com.example.backyardrealms.game.world.DungeonReward
+import com.example.backyardrealms.game.puzzle.FloorSwitch
+import com.example.backyardrealms.game.puzzle.PuzzleDoor
 import kotlin.math.sqrt
 
 class BackyardGame(context: Context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val worldBounds = RectF(0f, 0f, WORLD_WIDTH, WORLD_HEIGHT)
+    private var currentRoom = RoomId.BACKYARD
     private val camera = Camera2D(GameConfig.LOGICAL_WIDTH, GameConfig.LOGICAL_HEIGHT)
     private val playerSheet = SpriteSheet(BitmapFactory.decodeResource(context.resources, R.drawable.player_sheet), 24, 32)
     private val saveManager = SaveManager(context)
@@ -79,6 +86,27 @@ class BackyardGame(context: Context) {
     )
     private val chest = TreasureChest("first_chest", 580f, 370f, listOf("brass_key" to 1, "summer_berry" to 3))
     private val moonGate = MoonGate("moon_gate", RectF(690f, 202f, 714f, 350f))
+    private val fortEntrance = RoomPortal("goblin_fort_entrance", RectF(760f, 202f, 808f, 232f), "ENTER", "The Goblin Fort doorway is made from two old porch cushions.")
+    private val dungeonExit = RoomPortal("goblin_fort_exit", RectF(64f, 236f, 92f, 300f), "EXIT", "A strip of daylight leads back to the Moon Kingdom.")
+    private val treasurePassage = RoomPortal("treasure_passage", RectF(876f, 226f, 914f, 306f), "PASSAGE", "The blanket passage leads deeper into the fort.")
+    private val entryPlayerSwitch = FloorSwitch("moon_switch", RectF(400f, 290f, 438f, 310f))
+    private val entryMiaSwitch = FloorSwitch("sun_switch", RectF(510f, 290f, 548f, 310f))
+    private val entryDoor = PuzzleDoor("double_switch_door", RectF(696f, 184f, 724f, 356f))
+    private val dungeonReward = DungeonReward("moon_charm_chest", 760f, 250f)
+    private val goblinScout = GoblinScout("goblin_scout", 560f, 260f)
+    private val dungeonEntryObstacles = listOf(
+        RectF(0f, 0f, WORLD_WIDTH, 28f), RectF(0f, WORLD_HEIGHT - 28f, WORLD_WIDTH, WORLD_HEIGHT),
+        RectF(0f, 0f, 28f, WORLD_HEIGHT), RectF(WORLD_WIDTH - 28f, 0f, WORLD_WIDTH, WORLD_HEIGHT),
+        RectF(220f, 100f, 300f, 230f), RectF(220f, 340f, 300f, 470f),
+        RectF(610f, 80f, 690f, 210f), RectF(610f, 330f, 690f, 470f)
+    )
+    private val dungeonTreasureObstacles = listOf(
+        RectF(0f, 0f, WORLD_WIDTH, 28f), RectF(0f, WORLD_HEIGHT - 28f, WORLD_WIDTH, WORLD_HEIGHT),
+        RectF(0f, 0f, 28f, WORLD_HEIGHT), RectF(WORLD_WIDTH - 28f, 0f, WORLD_WIDTH, WORLD_HEIGHT),
+        RectF(290f, 120f, 380f, 210f), RectF(290f, 330f, 380f, 420f),
+        RectF(680f, 90f, 900f, 145f), RectF(680f, 395f, 900f, 450f)
+    )
+
     private val pickups = mutableListOf(
         WorldPickup("favorite_stick_pickup", "stick", 224f, 214f, itemCatalog),
         WorldPickup("garden_berry_pickup", "summer_berry", 625f, 442f, itemCatalog),
@@ -86,8 +114,16 @@ class BackyardGame(context: Context) {
     )
     private val particles = List(18) { i -> AmbientParticle("pollen_$i", WORLD_WIDTH, WORLD_HEIGHT, (i * 61f) % WORLD_WIDTH, 40f + (i * 83f) % (WORLD_HEIGHT - 80f), 4f + (i % 4), i * .7f) }
     private val baseObstacles = landmarks.map { it.collisionBounds }
-    private fun activeObstacles(): List<RectF> = if (theme == ImaginationTheme.FANTASY && !moonGate.unlocked) baseObstacles + moonGate.bounds else baseObstacles
-    private val interactables: List<Interactable> = landmarks + friend + chest + moonGate
+    private fun activeObstacles(): List<RectF> = when (currentRoom) {
+        RoomId.BACKYARD -> if (theme == ImaginationTheme.FANTASY && !moonGate.unlocked) baseObstacles + moonGate.bounds else baseObstacles
+        RoomId.GOBLIN_FORT_ENTRY -> dungeonEntryObstacles + entryDoor.collisionBounds()
+        RoomId.GOBLIN_FORT_TREASURE -> dungeonTreasureObstacles
+    }
+    private fun activeInteractables(): List<Interactable> = when (currentRoom) {
+        RoomId.BACKYARD -> landmarks + friend + chest + moonGate + if (theme == ImaginationTheme.FANTASY && chapterOne.sigilFound()) listOf(fortEntrance) else emptyList()
+        RoomId.GOBLIN_FORT_ENTRY -> listOf(friend, dungeonExit) + if (entryDoor.open) listOf(treasurePassage) else emptyList()
+        RoomId.GOBLIN_FORT_TREASURE -> listOf(friend, treasurePassage, dungeonReward)
+    }
     private var dialogue: String? = null
     private var nearbyInteractable: Interactable? = null
     private var showDebug = true
@@ -95,6 +131,7 @@ class BackyardGame(context: Context) {
     init {
         inventory.restore(saved.inventory, saved.equippedItemId)
         questFlags.restore(saved.questFlags)
+        currentRoom = RoomId.from(saved.roomId)
         // Migrate Chapter 1 Milestone 1 completion into the first-trial flag.
         if (questFlags.has(ChapterOneDirector.CHAPTER_COMPLETE) &&
             !questFlags.has(ChapterOneDirector.SIGIL_QUEST_ACCEPTED)) {
@@ -103,6 +140,7 @@ class BackyardGame(context: Context) {
         }
         val freshChapter = chapterOne.initializeFreshChapter()
         if (freshChapter) {
+            currentRoom = RoomId.BACKYARD
             player.setPosition(470f, 214f)
             theme = ImaginationTheme.REAL
         }
@@ -111,6 +149,9 @@ class BackyardGame(context: Context) {
         val collected = saved.collectedPickups.split(',').filter { it.isNotBlank() }.toSet()
         pickups.forEach { it.collected = it.id in collected }
         moonGate.unlocked = chapterOne.gateUnlocked()
+        entryDoor.open = chapterOne.dungeonDoorOpen()
+        dungeonReward.claimed = chapterOne.dungeonRewardClaimed()
+        if (chapterOne.goblinScoutDefeated()) goblinScout.receiveHit(DamageHit("load", 999, 0f, 0f, 999999))
         pickups.firstOrNull { it.id == "moon_sigil_pickup" }?.collected = chapterOne.sigilFound()
         if (freshChapter) {
             inventory.remove("stick", inventory.quantity("stick"))
@@ -179,6 +220,12 @@ class BackyardGame(context: Context) {
         }
         if (transition.isActive) return
 
+        if (currentRoom != RoomId.BACKYARD) {
+            updateDungeon(dt, input)
+            camera.follow(player.centerX, player.centerY, worldBounds, dt)
+            return
+        }
+
         collectTouchingPickups()
         nearbyInteractable = findNearestInteractable()
         when {
@@ -194,6 +241,8 @@ class BackyardGame(context: Context) {
             }
             input.interactPressed && nearbyInteractable is TreasureChest -> openChest(nearbyInteractable as TreasureChest)
             input.interactPressed && nearbyInteractable is MoonGate -> interactWithGate()
+            input.interactPressed && nearbyInteractable is RoomPortal -> interactWithPortal(nearbyInteractable as RoomPortal)
+            input.interactPressed && nearbyInteractable is DungeonReward -> claimDungeonReward()
             input.interactPressed && nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> {
                 when {
                     theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy() -> {
@@ -405,6 +454,10 @@ class BackyardGame(context: Context) {
         pickups.forEach { it.collected = false }
         moonGate.unlocked = false
         chapterOne.reset()
+        currentRoom = RoomId.BACKYARD
+        entryDoor.open = false
+        dungeonReward.claimed = false
+        goblinScout.restore()
         player.setPosition(470f, 214f)
         friend.setPosition(470f, 250f)
         firstTransformationPending = false
@@ -437,8 +490,117 @@ class BackyardGame(context: Context) {
         player.x, player.y, theme, worldTime,
         inventory.serialize(), inventory.equippedItemId, questFlags.serialize(),
         if (chest.opened) chest.id else "",
-        pickups.filter { it.collected }.joinToString(",") { it.id }
+        pickups.filter { it.collected }.joinToString(",") { it.id },
+        currentRoom.name
     ))
+
+    private fun interactWithPortal(portal: RoomPortal) {
+        when (portal.id) {
+            "goblin_fort_entrance" -> enterRoom(RoomId.GOBLIN_FORT_ENTRY, 118f, 260f, 146f, 286f)
+            "goblin_fort_exit" -> enterRoom(RoomId.BACKYARD, 770f, 238f, 742f, 260f)
+            "treasure_passage" -> {
+                if (currentRoom == RoomId.GOBLIN_FORT_ENTRY) enterRoom(RoomId.GOBLIN_FORT_TREASURE, 112f, 260f, 144f, 286f)
+                else enterRoom(RoomId.GOBLIN_FORT_ENTRY, 838f, 260f, 806f, 286f)
+            }
+        }
+    }
+
+    private fun enterRoom(room: RoomId, playerX: Float, playerY: Float, miaX: Float, miaY: Float) {
+        if (transition.isActive) return
+        transition.start {
+            currentRoom = room
+            player.setPosition(playerX, playerY)
+            friend.setPosition(miaX, miaY)
+            camera.reset()
+            nearbyInteractable = null
+            if (room != RoomId.BACKYARD) chapterOne.onGoblinFortEntered()
+            saveGame()
+        }
+    }
+
+    private fun updateDungeon(dt: Float, input: InputSnapshot) {
+        nearbyInteractable = findNearestInteractable()
+        when {
+            input.interactPressed && dialogue != null -> dialogue = null
+            input.interactPressed && nearbyInteractable is RoomPortal -> interactWithPortal(nearbyInteractable as RoomPortal)
+            input.interactPressed && nearbyInteractable is DungeonReward -> claimDungeonReward()
+            input.interactPressed && nearbyInteractable is FriendNpc -> { dialogue = if (currentRoom == RoomId.GOBLIN_FORT_ENTRY) "Sir Mia whispers, ‘These walls are definitely not blankets. Definitely.’" else "Sir Mia raises her shield. ‘The captain is guarding that royal toy box!’" }
+            else -> updateDungeonGameplay(dt, input)
+        }
+    }
+
+    private fun updateDungeonGameplay(dt: Float, input: InputSnapshot) {
+        val obstacles = activeObstacles()
+        val oldX = player.x; val oldY = player.y
+        val wasAttacking = player.isAttacking
+        player.update(dt, input, obstacles, worldBounds, inventory.equippedItemId == "stick")
+        val vx = if (dt > 0f) (player.x - oldX) / dt else 0f
+        val vy = if (dt > 0f) (player.y - oldY) / dt else 0f
+        if (currentRoom == RoomId.GOBLIN_FORT_ENTRY) {
+            entryPlayerSwitch.update(player.collisionBounds)
+            if (entryPlayerSwitch.pressed && !entryDoor.open) {
+                friend.updateScriptedPosition(dt, entryMiaSwitch.bounds.centerX(), entryMiaSwitch.bounds.centerY(), obstacles, worldBounds)
+            } else {
+                friend.updateCompanion(dt, player.centerX, player.centerY, vx, vy, player.facingDirection().first, player.facingDirection().second, player.isAttacking, false, obstacles, worldBounds)
+            }
+            entryMiaSwitch.update(friend.interactionBounds)
+            if (entryPlayerSwitch.pressed && entryMiaSwitch.pressed && !entryDoor.open) {
+                entryDoor.open = true
+                chapterOne.onDungeonDoorOpened()
+                dialogue = "Both painted switches sink into the floor. The blanket gate slides aside!"
+                saveGame()
+            }
+        } else {
+            friend.updateCompanion(dt, player.centerX, player.centerY, vx, vy, player.facingDirection().first, player.facingDirection().second, player.isAttacking, goblinScout.active, obstacles, worldBounds)
+            goblinScout.update(dt, player.centerX, player.centerY, obstacles, worldBounds)
+            if (player.isAttacking && goblinScout.active && RectF.intersects(player.attackBounds(), goblinScout.hurtBounds)) {
+                val kb = player.attackKnockback()
+                val alive = goblinScout.health.isAlive
+                if (goblinScout.receiveHit(DamageHit("player", itemCatalog["stick"]?.damage ?: 1, kb.first, kb.second, player.currentAttackId)) && alive && !goblinScout.health.isAlive) {
+                    chapterOne.onGoblinScoutDefeated(); saveGame()
+                }
+            }
+            if (goblinScout.active && RectF.intersects(player.hurtBounds, goblinScout.contactBounds)) {
+                val dx = player.centerX - goblinScout.centerX; val dy = player.centerY - goblinScout.centerY
+                val l = sqrt(dx * dx + dy * dy).coerceAtLeast(.001f)
+                if (player.receiveHit(DamageHit(goblinScout.id, 1, dx / l * 145f, dy / l * 145f, 0)) && !player.health.isAlive) {
+                    player.respawn(112f, 260f); friend.setPosition(144f, 286f)
+                }
+            }
+        }
+        if (!wasAttacking && player.isAttacking) eventBus.post(GameEvent.AttackStarted)
+    }
+
+    private fun claimDungeonReward() {
+        if (currentRoom != RoomId.GOBLIN_FORT_TREASURE) return
+        if (!chapterOne.goblinScoutDefeated()) { dialogue = "The Goblin Scout is still guarding the toy box."; return }
+        if (dungeonReward.claimed) { dialogue = dungeonReward.interactionText(); return }
+        dungeonReward.claimed = true
+        inventory.add("summer_berry", 5)
+        player.health.restore()
+        chapterOne.onDungeonRewardClaimed()
+        dialogue = "Inside is a cardboard Moon Charm and five Summer Berries. You feel completely refreshed!"
+        saveGame()
+    }
+
+    private fun drawDungeon(canvas: Canvas) {
+        paint.color = if (currentRoom == RoomId.GOBLIN_FORT_ENTRY) 0xFF4C372D.toInt() else 0xFF3D2E35.toInt()
+        canvas.drawRect(worldBounds, paint)
+        paint.color = 0xFF6E503E.toInt()
+        canvas.drawRect(28f, 28f, WORLD_WIDTH - 28f, WORLD_HEIGHT - 28f, paint)
+        paint.color = 0xFF8A6A50.toInt()
+        for (x in 40..920 step 48) canvas.drawRect(x.toFloat(), 28f, x + 5f, WORLD_HEIGHT - 28f, paint)
+        paint.color = 0xFF72527C.toInt()
+        canvas.drawRect(170f, 42f, 310f, 72f, paint); canvas.drawRect(650f, 42f, 790f, 72f, paint)
+        dungeonExit.draw(canvas, paint)
+        if (currentRoom == RoomId.GOBLIN_FORT_ENTRY) {
+            entryPlayerSwitch.draw(canvas, paint); entryMiaSwitch.draw(canvas, paint); entryDoor.draw(canvas, paint)
+            if (entryDoor.open) treasurePassage.draw(canvas, paint)
+        } else {
+            treasurePassage.draw(canvas, paint); dungeonReward.draw(canvas, paint); goblinScout.draw(canvas)
+        }
+        friend.draw(canvas)
+    }
 
     private fun beginFirstTransformationScene() {
         if (firstTransformationPending || transition.isActive) return
@@ -491,14 +653,19 @@ class BackyardGame(context: Context) {
 
     fun draw(canvas: Canvas) {
         camera.begin(canvas)
-        drawGround(canvas)
-        particles.forEach { it.draw(canvas) }
-        landmarks.forEach { it.draw(canvas) }
-        chest.draw(canvas, paint)
-        if (theme == ImaginationTheme.FANTASY) moonGate.draw(canvas, paint)
-        pickups.filter { it.id != "moon_sigil_pickup" || (theme == ImaginationTheme.FANTASY && chapterOne.gateUnlocked()) }.forEach { it.draw(canvas, paint) }
-        friend.draw(canvas)
-        if (theme == ImaginationTheme.FANTASY) enemies.forEach { it.draw(canvas) }
+        if (currentRoom == RoomId.BACKYARD) {
+            drawGround(canvas)
+            particles.forEach { it.draw(canvas) }
+            landmarks.forEach { it.draw(canvas) }
+            chest.draw(canvas, paint)
+            if (theme == ImaginationTheme.FANTASY) moonGate.draw(canvas, paint)
+            if (theme == ImaginationTheme.FANTASY && chapterOne.sigilFound()) fortEntrance.draw(canvas, paint)
+            pickups.filter { it.id != "moon_sigil_pickup" || (theme == ImaginationTheme.FANTASY && chapterOne.gateUnlocked()) }.forEach { it.draw(canvas, paint) }
+            friend.draw(canvas)
+            if (theme == ImaginationTheme.FANTASY) enemies.forEach { it.draw(canvas) }
+        } else {
+            drawDungeon(canvas)
+        }
         player.draw(canvas)
         if (showDebug) drawWorldDebug(canvas)
         camera.end(canvas)
@@ -518,7 +685,7 @@ class BackyardGame(context: Context) {
         }
     }
 
-    private fun findNearestInteractable(): Interactable? = interactables.firstOrNull {
+    private fun findNearestInteractable(): Interactable? = activeInteractables().firstOrNull {
         (it !is MoonGate || theme == ImaginationTheme.FANTASY) && RectF.intersects(player.collisionBounds, it.interactionBounds)
     }
 
@@ -585,7 +752,8 @@ class BackyardGame(context: Context) {
                     !chapterOne.endingComplete() -> "INTERACT: RETURN WITH MIA"
                 else -> "INTERACT: SWITCH WORLD"
             }
-            nearbyInteractable is TreasureChest -> "INTERACT: OPEN"
+            nearbyInteractable is TreasureChest || nearbyInteractable is DungeonReward -> "INTERACT: OPEN"
+            nearbyInteractable is RoomPortal -> "INTERACT: ENTER"
             else -> "INTERACT"
         }
         canvas.drawText(text, 240f, 240f, paint)
@@ -602,7 +770,7 @@ class BackyardGame(context: Context) {
 
     private fun drawWorldDebug(canvas: Canvas) {
         paint.style = Paint.Style.STROKE; paint.strokeWidth = 1f; paint.color = 0x99FFFF00.toInt()
-        landmarks.forEach { canvas.drawRect(it.collisionBounds, paint) }; canvas.drawRect(chest.bounds, paint)
+        if (currentRoom == RoomId.BACKYARD) { landmarks.forEach { canvas.drawRect(it.collisionBounds, paint) }; canvas.drawRect(chest.bounds, paint) } else { activeObstacles().forEach { canvas.drawRect(it, paint) } }
         if (theme == ImaginationTheme.FANTASY && !moonGate.unlocked) canvas.drawRect(moonGate.bounds, paint)
         paint.color = 0x9900FFFF.toInt(); nearbyInteractable?.let { canvas.drawRect(it.interactionBounds, paint) }
         if (player.isAttacking) { paint.color = 0x99FF3333.toInt(); canvas.drawRect(player.attackBounds(), paint) }
@@ -622,8 +790,8 @@ class BackyardGame(context: Context) {
     private fun drawDebugPanel(canvas: Canvas) {
         paint.color = 0xCC000000.toInt(); canvas.drawRect(6f, 6f, 320f, 80f, paint)
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.LEFT; paint.textSize = 10f
-        canvas.drawText("Backyard Realms Ch.1 M3", 12f, 18f, paint)
-        canvas.drawText("theme=$theme time=$worldTime", 12f, 30f, paint)
+        canvas.drawText("Backyard Realms Ch.1 M4", 12f, 18f, paint)
+        canvas.drawText("room=$currentRoom theme=$theme time=$worldTime", 12f, 30f, paint)
         canvas.drawText("${player.positionText()} hp=${player.health.current}/${player.health.maximum}", 12f, 42f, paint)
         canvas.drawText("equipped=${inventory.equippedItemId ?: "none"} slots=${inventory.allSlots().size}", 12f, 54f, paint)
         canvas.drawText("flags=${questFlags.all().size} chest=${if (chest.opened) "open" else "closed"}", 12f, 66f, paint)

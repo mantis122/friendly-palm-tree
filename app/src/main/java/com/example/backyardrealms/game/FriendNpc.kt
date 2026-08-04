@@ -145,6 +145,29 @@ class FriendNpc(x: Float, y: Float) : CharacterEntity(), Interactable {
         moveAxis(0f, velocityY * dt, obstacles, worldBounds)
     }
 
+
+    fun updateScriptedPosition(
+        dt: Float,
+        targetX: Float,
+        targetY: Float,
+        obstacles: List<RectF>,
+        worldBounds: RectF
+    ) {
+        val dx = targetX - centerX
+        val dy = targetY - centerY
+        val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+        if (distance < 2f) {
+            velocityX = 0f
+            velocityY = 0f
+            return
+        }
+        val safe = distance.coerceAtLeast(0.001f)
+        velocityX = dx / safe * FOLLOW_SPEED
+        velocityY = dy / safe * FOLLOW_SPEED
+        moveAxis(velocityX * dt, 0f, obstacles, worldBounds)
+        moveAxis(0f, velocityY * dt, obstacles, worldBounds)
+    }
+
     fun tryShieldBash(targetX: Float, targetY: Float): Boolean {
         if (theme != ImaginationTheme.FANTASY || shieldCooldown > 0f || retreatTimer > 0f) return false
         val dx = targetX - centerX

@@ -43,6 +43,8 @@ class Camera2D(
         y += (adjustedY - y) * smoothing
     }
 
+    fun reset() { initialized = false }
+
     fun begin(canvas: Canvas) {
         canvas.save()
         canvas.translate(-x, -y)

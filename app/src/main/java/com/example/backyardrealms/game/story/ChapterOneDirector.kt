@@ -29,6 +29,15 @@ class ChapterOneDirector(private val flags: QuestFlags) {
     }
 
     fun objective(theme: ImaginationTheme): String = when {
+        flags.has(DUNGEON_REWARD_CLAIMED) -> "Return through the Goblin Fort with Mia."
+        flags.has(MOON_SIGIL_FOUND) && theme == ImaginationTheme.FANTASY && !flags.has(GOBLIN_FORT_ENTERED) ->
+            "Enter the Goblin Fort beside the shed."
+        flags.has(GOBLIN_FORT_ENTERED) && !flags.has(DUNGEON_DOOR_OPEN) ->
+            "Stand on the moon switch while Mia holds the sun switch."
+        flags.has(DUNGEON_DOOR_OPEN) && !flags.has(GOBLIN_SCOUT_DEFEATED) ->
+            "Defeat the Goblin Scout in the treasure room."
+        flags.has(GOBLIN_SCOUT_DEFEATED) && !flags.has(DUNGEON_REWARD_CLAIMED) ->
+            "Open the royal toy box."
         flags.has(CHAPTER_ENDING_COMPLETE) -> "Enjoy the rest of the afternoon with Mia."
         flags.has(CHAPTER_COMPLETE) && theme == ImaginationTheme.FANTASY ->
             "Return to Moonkeep with Sir Mia."
@@ -137,7 +146,7 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         showBanner("MOON SIGIL FOUND", "Return to Sir Mia", 2.4f)
     }
 
-    fun readyToReturnHome(): Boolean = flags.has(CHAPTER_COMPLETE)
+    fun readyToReturnHome(): Boolean = flags.has(CHAPTER_COMPLETE) && flags.has(DUNGEON_REWARD_CLAIMED)
     fun endingComplete(): Boolean = flags.has(CHAPTER_ENDING_COMPLETE)
 
     fun returnHomeSceneText(): String =
@@ -165,6 +174,40 @@ class ChapterOneDirector(private val flags: QuestFlags) {
     fun gateUnlocked(): Boolean = flags.has(GATE_UNLOCKED)
     fun sigilFound(): Boolean = flags.has(MOON_SIGIL_FOUND)
 
+
+    fun onGoblinFortEntered() {
+        if (!flags.has(GOBLIN_FORT_ENTERED)) {
+            flags.set(GOBLIN_FORT_ENTERED)
+            showBanner("GOBLIN FORT", "Blanket banners and flashlight torches", 3.0f)
+        }
+    }
+
+    fun onDungeonDoorOpened() {
+        if (!flags.has(DUNGEON_DOOR_OPEN)) {
+            flags.set(DUNGEON_DOOR_OPEN)
+            showBanner("PASSAGE OPEN", "The two switches click together", 2.4f)
+        }
+    }
+
+    fun onGoblinScoutDefeated() {
+        if (!flags.has(GOBLIN_SCOUT_DEFEATED)) {
+            flags.set(GOBLIN_SCOUT_DEFEATED)
+            showBanner("FORT CAPTAIN DEFEATED", "Search the royal toy box", 2.4f)
+        }
+    }
+
+    fun onDungeonRewardClaimed() {
+        if (!flags.has(DUNGEON_REWARD_CLAIMED)) {
+            flags.set(DUNGEON_REWARD_CLAIMED)
+            showBanner("MOON CHARM FOUND", "A cardboard medal for true knights", 3.2f)
+        }
+    }
+
+    fun goblinFortEntered() = flags.has(GOBLIN_FORT_ENTERED)
+    fun dungeonDoorOpen() = flags.has(DUNGEON_DOOR_OPEN)
+    fun goblinScoutDefeated() = flags.has(GOBLIN_SCOUT_DEFEATED)
+    fun dungeonRewardClaimed() = flags.has(DUNGEON_REWARD_CLAIMED)
+
     fun reset() {
         listOf(
             CHAPTER_STARTED,
@@ -180,7 +223,11 @@ class ChapterOneDirector(private val flags: QuestFlags) {
             CHAPTER_COMPLETE,
             CHAPTER_ENDING_COMPLETE,
             GATE_REACTION,
-            SIGIL_REACTION
+            SIGIL_REACTION,
+            GOBLIN_FORT_ENTERED,
+            DUNGEON_DOOR_OPEN,
+            GOBLIN_SCOUT_DEFEATED,
+            DUNGEON_REWARD_CLAIMED
         ).forEach(flags::clear)
         initializeFreshChapter()
     }
@@ -206,5 +253,9 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         const val CHAPTER_ENDING_COMPLETE = "CH1_ENDING_COMPLETE"
         const val GATE_REACTION = "CH1_MIA_GATE_REACTION"
         const val SIGIL_REACTION = "CH1_MIA_SIGIL_REACTION"
+        const val GOBLIN_FORT_ENTERED = "CH1_GOBLIN_FORT_ENTERED"
+        const val DUNGEON_DOOR_OPEN = "CH1_DUNGEON_DOOR_OPEN"
+        const val GOBLIN_SCOUT_DEFEATED = "CH1_GOBLIN_SCOUT_DEFEATED"
+        const val DUNGEON_REWARD_CLAIMED = "CH1_DUNGEON_REWARD_CLAIMED"
     }
 }
