@@ -29,7 +29,13 @@ class ChapterOneDirector(private val flags: QuestFlags) {
     }
 
     fun objective(theme: ImaginationTheme): String = when {
-        flags.has(DUNGEON_REWARD_CLAIMED) -> "Return through the Goblin Fort with Mia."
+        flags.has(CROWN_FRAGMENT_CLAIMED) -> "Return through the Goblin Fort with Mia."
+        flags.has(BLANKET_KING_DEFEATED) && !flags.has(CROWN_FRAGMENT_CLAIMED) ->
+            "Claim the first Moon Crown fragment."
+        flags.has(DUNGEON_REWARD_CLAIMED) && !flags.has(BOSS_CHAMBER_ENTERED) ->
+            "Follow the secret blanket passage behind the royal toy box."
+        flags.has(BOSS_CHAMBER_ENTERED) && !flags.has(BLANKET_KING_DEFEATED) ->
+            "Defeat the Blanket King. Mia can break his blanket shield."
         flags.has(MOON_SIGIL_FOUND) && theme == ImaginationTheme.FANTASY && !flags.has(GOBLIN_FORT_ENTERED) ->
             "Enter the Goblin Fort beside the shed."
         flags.has(GOBLIN_FORT_ENTERED) && !flags.has(DUNGEON_DOOR_OPEN) ->
@@ -146,7 +152,7 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         showBanner("MOON SIGIL FOUND", "Return to Sir Mia", 2.4f)
     }
 
-    fun readyToReturnHome(): Boolean = flags.has(CHAPTER_COMPLETE) && flags.has(DUNGEON_REWARD_CLAIMED)
+    fun readyToReturnHome(): Boolean = flags.has(CHAPTER_COMPLETE) && flags.has(CROWN_FRAGMENT_CLAIMED)
     fun endingComplete(): Boolean = flags.has(CHAPTER_ENDING_COMPLETE)
 
     fun returnHomeSceneText(): String =
@@ -199,7 +205,28 @@ class ChapterOneDirector(private val flags: QuestFlags) {
     fun onDungeonRewardClaimed() {
         if (!flags.has(DUNGEON_REWARD_CLAIMED)) {
             flags.set(DUNGEON_REWARD_CLAIMED)
-            showBanner("MOON CHARM FOUND", "A cardboard medal for true knights", 3.2f)
+            showBanner("FORT'S SECRET", "A hidden blanket passage opens behind the toy box", 3.2f)
+        }
+    }
+
+    fun onBossChamberEntered() {
+        if (!flags.has(BOSS_CHAMBER_ENTERED)) {
+            flags.set(BOSS_CHAMBER_ENTERED)
+            showBanner("THE BLANKET THRONE", "Something enormous stirs beneath the quilts", 3.2f)
+        }
+    }
+
+    fun onBlanketKingDefeated() {
+        if (!flags.has(BLANKET_KING_DEFEATED)) {
+            flags.set(BLANKET_KING_DEFEATED)
+            showBanner("BLANKET KING DEFEATED", "The cardboard crown cracks apart", 3.4f)
+        }
+    }
+
+    fun onCrownFragmentClaimed() {
+        if (!flags.has(CROWN_FRAGMENT_CLAIMED)) {
+            flags.set(CROWN_FRAGMENT_CLAIMED)
+            showBanner("MOON CROWN FRAGMENT", "The first piece of a much larger mystery", 3.6f)
         }
     }
 
@@ -207,6 +234,9 @@ class ChapterOneDirector(private val flags: QuestFlags) {
     fun dungeonDoorOpen() = flags.has(DUNGEON_DOOR_OPEN)
     fun goblinScoutDefeated() = flags.has(GOBLIN_SCOUT_DEFEATED)
     fun dungeonRewardClaimed() = flags.has(DUNGEON_REWARD_CLAIMED)
+    fun bossChamberEntered() = flags.has(BOSS_CHAMBER_ENTERED)
+    fun blanketKingDefeated() = flags.has(BLANKET_KING_DEFEATED)
+    fun crownFragmentClaimed() = flags.has(CROWN_FRAGMENT_CLAIMED)
 
     fun reset() {
         listOf(
@@ -227,7 +257,10 @@ class ChapterOneDirector(private val flags: QuestFlags) {
             GOBLIN_FORT_ENTERED,
             DUNGEON_DOOR_OPEN,
             GOBLIN_SCOUT_DEFEATED,
-            DUNGEON_REWARD_CLAIMED
+            DUNGEON_REWARD_CLAIMED,
+            BOSS_CHAMBER_ENTERED,
+            BLANKET_KING_DEFEATED,
+            CROWN_FRAGMENT_CLAIMED
         ).forEach(flags::clear)
         initializeFreshChapter()
     }
@@ -257,5 +290,8 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         const val DUNGEON_DOOR_OPEN = "CH1_DUNGEON_DOOR_OPEN"
         const val GOBLIN_SCOUT_DEFEATED = "CH1_GOBLIN_SCOUT_DEFEATED"
         const val DUNGEON_REWARD_CLAIMED = "CH1_DUNGEON_REWARD_CLAIMED"
+        const val BOSS_CHAMBER_ENTERED = "CH1_BOSS_CHAMBER_ENTERED"
+        const val BLANKET_KING_DEFEATED = "CH1_BLANKET_KING_DEFEATED"
+        const val CROWN_FRAGMENT_CLAIMED = "CH1_CROWN_FRAGMENT_CLAIMED"
     }
 }
