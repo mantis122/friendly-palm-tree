@@ -11,9 +11,14 @@ class TouchControls(private val input: InputState) {
     private val joystickCenterY = GameConfig.LOGICAL_HEIGHT - 66f
     private val joystickRadius = 44f
     private val knobRadius = 19f
-    private val actionCenterX = GameConfig.LOGICAL_WIDTH - 66f
-    private val actionCenterY = GameConfig.LOGICAL_HEIGHT - 62f
-    private val actionRadius = 34f
+
+    private val attackCenterX = GameConfig.LOGICAL_WIDTH - 60f
+    private val attackCenterY = GameConfig.LOGICAL_HEIGHT - 58f
+    private val attackRadius = 34f
+    private val interactCenterX = GameConfig.LOGICAL_WIDTH - 108f
+    private val interactCenterY = GameConfig.LOGICAL_HEIGHT - 108f
+    private val interactRadius = 24f
+
     private val developerCenterX = GameConfig.LOGICAL_WIDTH - 30f
     private val developerCenterY = 22f
     private val developerRadius = 18f
@@ -22,10 +27,15 @@ class TouchControls(private val input: InputState) {
     private val inventoryRadius = 18f
 
     private var movePointerId = MotionEvent.INVALID_POINTER_ID
-    private var actionPointerId = MotionEvent.INVALID_POINTER_ID
+    private var attackPointerId = MotionEvent.INVALID_POINTER_ID
+    private var interactPointerId = MotionEvent.INVALID_POINTER_ID
     private var knobX = joystickCenterX
     private var knobY = joystickCenterY
-    private var actionHeld = false
+    private var attackHeld = false
+    private var interactHeld = false
+    private var interactAvailable = false
+
+    fun setInteractAvailable(available: Boolean) { interactAvailable = available }
 
     fun onTouch(event: MotionEvent, viewport: Viewport): Boolean {
         when (event.actionMasked) {
@@ -37,14 +47,19 @@ class TouchControls(private val input: InputState) {
                 when {
                     insideCircle(x, y, developerCenterX, developerCenterY, developerRadius) -> input.queueDeveloper()
                     insideCircle(x, y, inventoryCenterX, inventoryCenterY, inventoryRadius) -> input.queueInventory()
+                    insideCircle(x, y, interactCenterX, interactCenterY, interactRadius) && interactPointerId == MotionEvent.INVALID_POINTER_ID -> {
+                        interactPointerId = id
+                        interactHeld = true
+                        input.queueInteract()
+                    }
+                    insideCircle(x, y, attackCenterX, attackCenterY, attackRadius) && attackPointerId == MotionEvent.INVALID_POINTER_ID -> {
+                        attackPointerId = id
+                        attackHeld = true
+                        input.queueAttack()
+                    }
                     x < GameConfig.LOGICAL_WIDTH * 0.5f && movePointerId == MotionEvent.INVALID_POINTER_ID -> {
                         movePointerId = id
                         updateJoystick(x, y)
-                    }
-                    insideCircle(x, y, actionCenterX, actionCenterY, actionRadius) && actionPointerId == MotionEvent.INVALID_POINTER_ID -> {
-                        actionPointerId = id
-                        actionHeld = true
-                        input.queueAction()
                     }
                 }
             }
@@ -66,40 +81,73 @@ class TouchControls(private val input: InputState) {
         canvas.drawCircle(joystickCenterX, joystickCenterY, joystickRadius, paint)
         paint.color = 0x99FFFFFF.toInt()
         canvas.drawCircle(knobX, knobY, knobRadius, paint)
-        paint.color = if (actionHeld) 0xCCF0B040.toInt() else 0x99D08030.toInt()
-        canvas.drawCircle(actionCenterX, actionCenterY, actionRadius, paint)
-        paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.CENTER; paint.textSize = 13f
-        canvas.drawText("ACTION", actionCenterX, actionCenterY + 4f, paint)
+
+        paint.color = if (attackHeld) 0xCCE05040.toInt() else 0x99B93E32.toInt()
+        canvas.drawCircle(attackCenterX, attackCenterY, attackRadius, paint)
+        paint.color = 0xFFFFFFFF.toInt()
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 12f
+        canvas.drawText("ATTACK", attackCenterX, attackCenterY + 4f, paint)
+
+        paint.color = when {
+            interactHeld -> 0xCCD49B38.toInt()
+            interactAvailable -> 0xBBAE7A2D.toInt()
+            else -> 0x553F3F3F
+        }
+        canvas.drawCircle(interactCenterX, interactCenterY, interactRadius, paint)
+        paint.color = if (interactAvailable) 0xFFFFFFFF.toInt() else 0x88FFFFFF.toInt()
+        paint.textSize = 9f
+        canvas.drawText("INTERACT", interactCenterX, interactCenterY + 3f, paint)
+
         drawSmallButton(canvas, inventoryCenterX, inventoryCenterY, "BAG")
         drawSmallButton(canvas, developerCenterX, developerCenterY, "DEV")
     }
 
     private fun drawSmallButton(canvas: Canvas, x: Float, y: Float, label: String) {
-        paint.color = 0xAA222222.toInt(); canvas.drawCircle(x, y, 18f, paint)
-        paint.color = 0xFFFFFFFF.toInt(); paint.textSize = 9f; canvas.drawText(label, x, y + 3f, paint)
+        paint.color = 0xAA222222.toInt()
+        canvas.drawCircle(x, y, 18f, paint)
+        paint.color = 0xFFFFFFFF.toInt()
+        paint.textSize = 9f
+        canvas.drawText(label, x, y + 3f, paint)
     }
 
     private fun updateJoystick(x: Float, y: Float) {
-        val dx = x - joystickCenterX; val dy = y - joystickCenterY
+        val dx = x - joystickCenterX
+        val dy = y - joystickCenterY
         val distance = sqrt(dx * dx + dy * dy)
         val amount = if (distance > joystickRadius && distance > 0f) joystickRadius / distance else 1f
-        val limitedX = dx * amount; val limitedY = dy * amount
-        knobX = joystickCenterX + limitedX; knobY = joystickCenterY + limitedY
+        val limitedX = dx * amount
+        val limitedY = dy * amount
+        knobX = joystickCenterX + limitedX
+        knobY = joystickCenterY + limitedY
         input.setMovement(limitedX / joystickRadius, limitedY / joystickRadius)
     }
 
     private fun releasePointer(id: Int) {
-        if (id == movePointerId) { movePointerId = MotionEvent.INVALID_POINTER_ID; knobX = joystickCenterX; knobY = joystickCenterY; input.setMovement(0f, 0f) }
-        if (id == actionPointerId) { actionPointerId = MotionEvent.INVALID_POINTER_ID; actionHeld = false }
+        if (id == movePointerId) {
+            movePointerId = MotionEvent.INVALID_POINTER_ID
+            knobX = joystickCenterX
+            knobY = joystickCenterY
+            input.setMovement(0f, 0f)
+        }
+        if (id == attackPointerId) { attackPointerId = MotionEvent.INVALID_POINTER_ID; attackHeld = false }
+        if (id == interactPointerId) { interactPointerId = MotionEvent.INVALID_POINTER_ID; interactHeld = false }
     }
 
     private fun reset() {
-        movePointerId = MotionEvent.INVALID_POINTER_ID; actionPointerId = MotionEvent.INVALID_POINTER_ID
-        knobX = joystickCenterX; knobY = joystickCenterY; actionHeld = false; input.clear()
+        movePointerId = MotionEvent.INVALID_POINTER_ID
+        attackPointerId = MotionEvent.INVALID_POINTER_ID
+        interactPointerId = MotionEvent.INVALID_POINTER_ID
+        knobX = joystickCenterX
+        knobY = joystickCenterY
+        attackHeld = false
+        interactHeld = false
+        input.clear()
     }
 
     private fun insideCircle(x: Float, y: Float, cx: Float, cy: Float, radius: Float): Boolean {
-        val dx = x - cx; val dy = y - cy
+        val dx = x - cx
+        val dy = y - cy
         return dx * dx + dy * dy <= radius * radius
     }
 }

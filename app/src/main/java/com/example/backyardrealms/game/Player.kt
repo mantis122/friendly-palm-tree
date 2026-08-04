@@ -75,7 +75,7 @@ class Player(
         moveAxis(velocityX * dt, 0f, obstacles, bounds)
         moveAxis(0f, velocityY * dt, obstacles, bounds)
 
-        if (canAttack && input.actionPressed && actionTimer <= 0f && knockbackTimer <= 0f) {
+        if (canAttack && input.attackPressed && actionTimer <= 0f && knockbackTimer <= 0f) {
             actionTimer = ACTION_SECONDS
             attackId++
         }
@@ -132,6 +132,11 @@ class Player(
         val cx = body.centerX() + nx * 22f
         val cy = body.centerY() + ny * 22f
         return RectF(cx - 11f, cy - 11f, cx + 11f, cy + 11f)
+    }
+
+    fun facingDirection(): Pair<Float, Float> {
+        val length = sqrt(facingX * facingX + facingY * facingY).coerceAtLeast(0.001f)
+        return Pair(facingX / length, facingY / length)
     }
 
     fun attackKnockback(): Pair<Float, Float> {

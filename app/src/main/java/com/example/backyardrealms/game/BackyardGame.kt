@@ -161,7 +161,7 @@ class BackyardGame(context: Context) {
             return
         }
         if (inventoryOpen) {
-            if (input.actionPressed) inventoryOpen = false
+            if (input.interactPressed) inventoryOpen = false
             val pageCount = kotlin.math.max(1, (inventory.allSlots().size + 2) / 3)
             if (kotlin.math.abs(input.moveY) > 0.7f && !inventoryInputLatched) {
                 inventoryPage = if (input.moveY < 0f) {
@@ -182,7 +182,7 @@ class BackyardGame(context: Context) {
         collectTouchingPickups()
         nearbyInteractable = findNearestInteractable()
         when {
-            input.actionPressed && dialogue != null -> {
+            input.interactPressed && dialogue != null -> {
                 dialogue = null
                 if (firstTransformationPending) {
                     firstTransformationPending = false
@@ -192,9 +192,9 @@ class BackyardGame(context: Context) {
                     startThemeSwitch()
                 }
             }
-            input.actionPressed && nearbyInteractable is TreasureChest -> openChest(nearbyInteractable as TreasureChest)
-            input.actionPressed && nearbyInteractable is MoonGate -> interactWithGate()
-            input.actionPressed && nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> {
+            input.interactPressed && nearbyInteractable is TreasureChest -> openChest(nearbyInteractable as TreasureChest)
+            input.interactPressed && nearbyInteractable is MoonGate -> interactWithGate()
+            input.interactPressed && nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> {
                 when {
                     theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy() -> {
                         dialogue = chapterOne.fortBlockedMessage()
@@ -209,14 +209,14 @@ class BackyardGame(context: Context) {
                     else -> startThemeSwitch()
                 }
             }
-            input.actionPressed && nearbyInteractable != null -> interactWith(nearbyInteractable!!)
+            input.interactPressed && nearbyInteractable != null -> interactWith(nearbyInteractable!!)
             else -> updateGameplay(dt, input)
         }
         camera.follow(player.centerX, player.centerY, worldBounds, dt)
     }
 
     private fun updateDeveloper(input: InputSnapshot) {
-        if (input.actionPressed) startThemeSwitch()
+        if (input.interactPressed) startThemeSwitch()
         if (kotlin.math.abs(input.moveY) > 0.7f && !verticalInputLatched) {
             if (input.moveY < 0f) worldTime = worldTime.next() else enemies.forEach { it.forceRespawn() }
             verticalInputLatched = true
@@ -240,19 +240,31 @@ class BackyardGame(context: Context) {
         val playerVelocityX = if (dt > 0f) (player.x - oldX) / dt else 0f
         val playerVelocityY = if (dt > 0f) (player.y - oldY) / dt else 0f
         if (theme == ImaginationTheme.FANTASY && chapterOne.hasEnteredFantasy()) {
+            val facing = player.facingDirection()
+            val enemyNearby = enemies.any { enemy ->
+                if (!enemy.active) false else {
+                    val dx = enemy.centerX - player.centerX
+                    val dy = enemy.centerY - player.centerY
+                    dx * dx + dy * dy <= COMPANION_COMBAT_NOTICE_DISTANCE * COMPANION_COMBAT_NOTICE_DISTANCE
+                }
+            }
             friend.updateCompanion(
-                dt,
-                player.centerX,
-                player.centerY,
-                playerVelocityX,
-                playerVelocityY,
-                obstacles,
-                worldBounds
+                dt = dt,
+                playerX = player.centerX,
+                playerY = player.centerY,
+                playerVelocityX = playerVelocityX,
+                playerVelocityY = playerVelocityY,
+                playerFacingX = facing.first,
+                playerFacingY = facing.second,
+                playerAttacking = player.isAttacking,
+                enemyNearby = enemyNearby,
+                obstacles = obstacles,
+                worldBounds = worldBounds
             )
         }
         if (player.x != oldX || player.y != oldY) eventBus.post(GameEvent.PlayerMoved(player.x, player.y))
         if (!wasAttacking && player.isAttacking) eventBus.post(GameEvent.AttackStarted)
-        if (input.actionPressed && !canAttack && nearbyInteractable == null) dialogue = "You need something to swing first."
+        if (input.attackPressed && !canAttack) dialogue = "You need something to swing first."
 
         if (theme != ImaginationTheme.FANTASY) return
 
@@ -474,6 +486,9 @@ class BackyardGame(context: Context) {
         }
     }
 
+    fun isInteractionAvailable(): Boolean =
+        dialogue != null || (!developerOpen && !inventoryOpen && nearbyInteractable != null)
+
     fun draw(canvas: Canvas) {
         camera.begin(canvas)
         drawGround(canvas)
@@ -564,14 +579,14 @@ class BackyardGame(context: Context) {
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.CENTER; paint.textSize = 11f
         val text = when {
             nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> when {
-                theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy() -> "ACTION: CHECK FORT"
-                theme == ImaginationTheme.REAL && !chapterOne.hasEnteredFantasy() -> "ACTION: ENTER WITH MIA"
+                theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy() -> "INTERACT: CHECK FORT"
+                theme == ImaginationTheme.REAL && !chapterOne.hasEnteredFantasy() -> "INTERACT: ENTER WITH MIA"
                 theme == ImaginationTheme.FANTASY && chapterOne.readyToReturnHome() &&
-                    !chapterOne.endingComplete() -> "ACTION: RETURN WITH MIA"
-                else -> "ACTION: SWITCH WORLD"
+                    !chapterOne.endingComplete() -> "INTERACT: RETURN WITH MIA"
+                else -> "INTERACT: SWITCH WORLD"
             }
-            nearbyInteractable is TreasureChest -> "ACTION: OPEN"
-            else -> "ACTION: INTERACT"
+            nearbyInteractable is TreasureChest -> "INTERACT: OPEN"
+            else -> "INTERACT"
         }
         canvas.drawText(text, 240f, 240f, paint)
     }
@@ -582,7 +597,7 @@ class BackyardGame(context: Context) {
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.LEFT; paint.textSize = 12f
         canvas.drawText(text.take(68), 44f, 216f, paint)
         if (text.length > 68) canvas.drawText(text.drop(68).take(68), 44f, 233f, paint)
-        paint.textAlign = Paint.Align.RIGHT; paint.textSize = 9f; canvas.drawText("Tap ACTION to close", 436f, 248f, paint)
+        paint.textAlign = Paint.Align.RIGHT; paint.textSize = 9f; canvas.drawText("Tap INTERACT to close", 436f, 248f, paint)
     }
 
     private fun drawWorldDebug(canvas: Canvas) {
@@ -594,6 +609,12 @@ class BackyardGame(context: Context) {
         if (theme == ImaginationTheme.FANTASY) enemies.filter { it.active }.forEach { enemy ->
             paint.color = 0x99FF66FF.toInt(); canvas.drawRect(enemy.hurtBounds, paint)
             paint.color = 0x99FF9900.toInt(); canvas.drawRect(enemy.contactBounds, paint)
+        }
+        if (theme == ImaginationTheme.FANTASY && chapterOne.hasEnteredFantasy()) {
+            paint.color = if (friend.debugCombatMode) 0x99FF5555.toInt() else 0x9966FFAA.toInt()
+            canvas.drawCircle(player.centerX, player.centerY, friend.debugKeepOutRadius, paint)
+            canvas.drawCircle(friend.debugPreferredX, friend.debugPreferredY, 5f, paint)
+            canvas.drawLine(friend.centerX, friend.centerY, friend.debugPreferredX, friend.debugPreferredY, paint)
         }
         paint.style = Paint.Style.FILL
     }
@@ -686,7 +707,7 @@ class BackyardGame(context: Context) {
         paint.color = 0xF0111111.toInt(); canvas.drawRoundRect(42f, 30f, 438f, 248f, 10f, 10f, paint)
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.CENTER; paint.textSize = 16f; canvas.drawText("ENGINE PLAYGROUND / CONTENT", 240f, 52f, paint)
         paint.textSize = 10f
-        canvas.drawText("ACTION theme  •  UP time  •  DOWN enemy", 240f, 70f, paint)
+        canvas.drawText("INTERACT theme  •  UP time  •  DOWN enemy", 240f, 70f, paint)
         canvas.drawText("LEFT reset Chapter 1  •  RIGHT equip/unequip stick", 240f, 84f, paint)
         canvas.drawText("ITEM CATALOG", 240f, 105f, paint)
         itemCatalog.all().forEachIndexed { index, item ->
@@ -705,5 +726,6 @@ class BackyardGame(context: Context) {
     companion object {
         private const val WORLD_WIDTH = 960f
         private const val WORLD_HEIGHT = 540f
+        private const val COMPANION_COMBAT_NOTICE_DISTANCE = 125f
     }
 }

@@ -82,6 +82,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             viewport.update(width, height)
             viewport.begin(canvas)
             game.draw(canvas)
+            controls.setInteractAvailable(game.isInteractionAvailable())
             controls.draw(canvas)
             viewport.end(canvas)
         } finally {

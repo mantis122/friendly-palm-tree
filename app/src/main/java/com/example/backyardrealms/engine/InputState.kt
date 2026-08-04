@@ -5,7 +5,8 @@ import kotlin.math.sqrt
 data class InputSnapshot(
     val moveX: Float,
     val moveY: Float,
-    val actionPressed: Boolean,
+    val attackPressed: Boolean,
+    val interactPressed: Boolean,
     val developerPressed: Boolean,
     val inventoryPressed: Boolean
 )
@@ -13,7 +14,8 @@ data class InputSnapshot(
 class InputState {
     private var moveX = 0f
     private var moveY = 0f
-    private var actionQueued = false
+    private var attackQueued = false
+    private var interactQueued = false
     private var developerQueued = false
     private var inventoryQueued = false
 
@@ -29,14 +31,16 @@ class InputState {
         }
     }
 
-    @Synchronized fun queueAction() { actionQueued = true }
+    @Synchronized fun queueAttack() { attackQueued = true }
+    @Synchronized fun queueInteract() { interactQueued = true }
     @Synchronized fun queueDeveloper() { developerQueued = true }
     @Synchronized fun queueInventory() { inventoryQueued = true }
 
     @Synchronized
     fun snapshot(): InputSnapshot {
-        val result = InputSnapshot(moveX, moveY, actionQueued, developerQueued, inventoryQueued)
-        actionQueued = false
+        val result = InputSnapshot(moveX, moveY, attackQueued, interactQueued, developerQueued, inventoryQueued)
+        attackQueued = false
+        interactQueued = false
         developerQueued = false
         inventoryQueued = false
         return result
@@ -46,7 +50,8 @@ class InputState {
     fun clear() {
         moveX = 0f
         moveY = 0f
-        actionQueued = false
+        attackQueued = false
+        interactQueued = false
         developerQueued = false
         inventoryQueued = false
     }
