@@ -30,6 +30,11 @@ class ChapterOneDirector(private val flags: QuestFlags) {
     }
 
     fun objective(theme: ImaginationTheme): String = when {
+        flags.has(CHAPTER_ENDING_COMPLETE) -> "Chapter One complete. Explore the backyard."
+        flags.has(MIA_WENT_HOME) -> "Go back inside the fort."
+        flags.has(RETURNED_TO_REALITY) -> "Talk to Mia before she heads home."
+        flags.has(ENDING_REVELATION_STARTED) && theme == ImaginationTheme.FANTASY ->
+            "Finish talking with Sir Mia at Moonkeep."
         flags.has(CROWN_FRAGMENT_CLAIMED) -> "Return through the Goblin Fort with Mia."
         flags.has(BLANKET_KING_DEFEATED) && !flags.has(CROWN_FRAGMENT_CLAIMED) ->
             "Claim the first Moon Crown fragment."
@@ -103,8 +108,12 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         }
 
         return when {
+            flags.has(MIA_WENT_HOME) ->
+                "Mia has already headed home."
+            flags.has(RETURNED_TO_REALITY) ->
+                "Mia looks at the dull little piece of metal in your hand. “So... you really didn't put that in the fort?”"
             flags.has(CHAPTER_ENDING_COMPLETE) ->
-                "That was a good one. Tomorrow we should add a dragon. Or two dragons."
+                "The backyard is quiet now, but the crescent mark inside the fort is still there."
             !flags.has(TALKED_TO_MIA) -> {
                 flags.set(TALKED_TO_MIA)
                 "You're not seriously going to fight Moon Goblins without your favorite stick. Didn't you leave it by the old tree again?"
@@ -169,14 +178,27 @@ class ChapterOneDirector(private val flags: QuestFlags) {
 
     fun readyToReturnHome(): Boolean = flags.has(CHAPTER_COMPLETE) && flags.has(CROWN_FRAGMENT_CLAIMED)
     fun endingComplete(): Boolean = flags.has(CHAPTER_ENDING_COMPLETE)
+    fun returnedToReality(): Boolean = flags.has(RETURNED_TO_REALITY)
+    fun miaWentHome(): Boolean = flags.has(MIA_WENT_HOME)
+    fun crescentMarkFound(): Boolean = flags.has(CRESCENT_MARK_FOUND)
 
-    fun returnHomeSceneText(): String =
-        "Sir Mia lowers her cardboard shield. “Moon Kingdom saved. Race you through the fort!”"
+    fun beginEndingRevelation() { flags.set(ENDING_REVELATION_STARTED) }
 
-    fun onReturnedHome() {
-        if (flags.has(CHAPTER_ENDING_COMPLETE)) return
+    fun onReturnedToReality() {
+        flags.set(RETURNED_TO_REALITY)
+        showBanner("BACKYARD", "Just an ordinary summer afternoon again", 3.0f)
+    }
+
+    fun onMiaWentHome() {
+        flags.set(MIA_WENT_HOME)
+        showBanner("SEE YOU TOMORROW", "For the first time today, the backyard is quiet", 3.0f)
+    }
+
+    fun onCrescentMarkFound() {
+        if (flags.has(CRESCENT_MARK_FOUND)) return
+        flags.set(CRESCENT_MARK_FOUND)
         flags.set(CHAPTER_ENDING_COMPLETE)
-        showBanner("ADVENTURE COMPLETE", "Tomorrow, the backyard can become anything", 4.0f)
+        showBanner("CHAPTER ONE — THE MOON KINGDOM", "COMPLETE", 5.0f)
     }
 
     fun companionGateReaction(): String? {
@@ -315,7 +337,11 @@ class ChapterOneDirector(private val flags: QuestFlags) {
             DUNGEON_REWARD_CLAIMED,
             BOSS_CHAMBER_ENTERED,
             BLANKET_KING_DEFEATED,
-            CROWN_FRAGMENT_CLAIMED
+            CROWN_FRAGMENT_CLAIMED,
+            ENDING_REVELATION_STARTED,
+            RETURNED_TO_REALITY,
+            MIA_WENT_HOME,
+            CRESCENT_MARK_FOUND
         ).forEach(flags::clear)
         initializeFreshChapter()
     }
@@ -348,5 +374,9 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         const val BOSS_CHAMBER_ENTERED = "CH1_BOSS_CHAMBER_ENTERED"
         const val BLANKET_KING_DEFEATED = "CH1_BLANKET_KING_DEFEATED"
         const val CROWN_FRAGMENT_CLAIMED = "CH1_CROWN_FRAGMENT_CLAIMED"
+        const val ENDING_REVELATION_STARTED = "CH1_ENDING_REVELATION_STARTED"
+        const val RETURNED_TO_REALITY = "CH1_RETURNED_TO_REALITY"
+        const val MIA_WENT_HOME = "CH1_MIA_WENT_HOME"
+        const val CRESCENT_MARK_FOUND = "CH1_CRESCENT_MARK_FOUND"
     }
 }

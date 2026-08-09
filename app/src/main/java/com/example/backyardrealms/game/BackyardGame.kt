@@ -19,6 +19,7 @@ import com.example.backyardrealms.engine.inventory.ItemCatalog
 import com.example.backyardrealms.engine.quest.QuestFlags
 import com.example.backyardrealms.engine.save.GameSave
 import com.example.backyardrealms.engine.save.SaveManager
+import com.example.backyardrealms.engine.story.SequenceRunner
 import com.example.backyardrealms.engine.time.WorldTime
 import com.example.backyardrealms.engine.world.Interactable
 import com.example.backyardrealms.game.ambient.AmbientParticle
@@ -75,7 +76,7 @@ class BackyardGame(context: Context) {
     private var verticalInputLatched = false
     private var horizontalInputLatched = false
     private var firstTransformationPending = false
-    private var chapterEndingPending = false
+    private val sequence = SequenceRunner()
 
     private fun a(color: Int, label: String, message: String) = LandmarkAppearance(color, label, message)
     private val landmarks = listOf(
@@ -135,7 +136,10 @@ class BackyardGame(context: Context) {
         RoomId.GOBLIN_FORT_BOSS -> bossArenaObstacles
     }
     private fun activeInteractables(): List<Interactable> = when (currentRoom) {
-        RoomId.BACKYARD -> landmarks + friend + chest + moonGate + if (theme == ImaginationTheme.FANTASY && chapterOne.sigilFound()) listOf(fortEntrance) else emptyList()
+        RoomId.BACKYARD -> landmarks +
+            (if (!chapterOne.miaWentHome()) listOf(friend) else emptyList()) +
+            chest + moonGate +
+            (if (theme == ImaginationTheme.FANTASY && chapterOne.sigilFound()) listOf(fortEntrance) else emptyList())
         RoomId.GOBLIN_FORT_ENTRY -> listOf(friend, dungeonExit) + if (entryDoor.open) listOf(treasurePassage) else emptyList()
         RoomId.GOBLIN_FORT_TREASURE -> listOf(friend, treasureReturn, dungeonReward) + if (dungeonReward.claimed) listOf(bossEntrance) else emptyList()
         RoomId.GOBLIN_FORT_BOSS -> listOf(friend) +
@@ -216,6 +220,16 @@ class BackyardGame(context: Context) {
         saveTimer += dt
         if (saveTimer >= 5f) { saveGame(); saveTimer = 0f }
 
+        if (sequence.isActive) {
+            dialogue = sequence.message
+            if (input.interactPressed) {
+                sequence.interact()
+                dialogue = sequence.message
+            }
+            camera.follow(player.centerX, player.centerY, worldBounds, dt)
+            return
+        }
+
         if (input.developerPressed) {
             developerOpen = !developerOpen
             inventoryOpen = false
@@ -265,9 +279,6 @@ class BackyardGame(context: Context) {
                 if (firstTransformationPending) {
                     firstTransformationPending = false
                     startThemeSwitch()
-                } else if (chapterEndingPending) {
-                    chapterEndingPending = false
-                    startThemeSwitch()
                 }
             }
             input.interactPressed && nearbyInteractable is TreasureChest -> openChest(nearbyInteractable as TreasureChest)
@@ -284,9 +295,17 @@ class BackyardGame(context: Context) {
                         beginFirstTransformationScene()
                     }
                     theme == ImaginationTheme.FANTASY && chapterOne.readyToReturnHome() &&
-                        !chapterOne.endingComplete() -> {
+                        !chapterOne.returnedToReality() -> {
                         beginChapterEndingScene()
                     }
+                    theme == ImaginationTheme.REAL && chapterOne.miaWentHome() &&
+                        !chapterOne.crescentMarkFound() -> discoverCrescentMark()
+                    theme == ImaginationTheme.REAL && chapterOne.returnedToReality() &&
+                        !chapterOne.miaWentHome() -> {
+                        dialogue = "The fort can wait. Mia is still here—you should talk to her before she heads home."
+                    }
+                    chapterOne.endingComplete() ->
+                        dialogue = "Inside the fort, the tiny crescent scratch is still exactly where you found it."
                     else -> startThemeSwitch()
                 }
             }
@@ -468,6 +487,10 @@ class BackyardGame(context: Context) {
         }
         if (target is FriendNpc) {
             questFlags.set("MET_MIA")
+            if (theme == ImaginationTheme.REAL && chapterOne.returnedToReality() && !chapterOne.miaWentHome()) {
+                beginMiaFarewellScene()
+                return
+            }
             dialogue = chapterOne.miaDialogue(theme)
         } else {
             dialogue = target.interactionText()
@@ -493,7 +516,7 @@ class BackyardGame(context: Context) {
         player.setPosition(470f, 214f)
         friend.setPosition(470f, 250f)
         firstTransformationPending = false
-        chapterEndingPending = false
+        sequence.clear()
         theme = ImaginationTheme.REAL
         landmarks.forEach { it.theme = theme }
         friend.theme = theme
@@ -758,12 +781,51 @@ class BackyardGame(context: Context) {
     }
 
     private fun beginChapterEndingScene() {
-        if (chapterEndingPending || transition.isActive) return
+        if (sequence.isActive || transition.isActive) return
         player.setPosition(466f, 166f)
         friend.setPosition(488f, 166f)
         nearbyInteractable = null
-        chapterEndingPending = true
-        dialogue = chapterOne.returnHomeSceneText()
+        chapterOne.beginEndingRevelation()
+        saveGame()
+        sequence.start(listOf(
+            SequenceRunner.Step.Message("Sir Mia sets her cardboard shield down. “Okay. Moon Kingdom saved.”"),
+            SequenceRunner.Step.Message("She turns the silver crown fragment over in her hands. “Wait... did you make this part?”"),
+            SequenceRunner.Step.Message("You shake your head. Mia stops smiling. “I didn't either. We never made this.”"),
+            SequenceRunner.Step.Message("For a moment Moonkeep is completely quiet. Then Mia says, “Let's take it outside.”"),
+            SequenceRunner.Step.Action { startThemeSwitch() }
+        ))
+        dialogue = sequence.message
+    }
+
+    private fun beginMiaFarewellScene() {
+        if (sequence.isActive) return
+        sequence.start(listOf(
+            SequenceRunner.Step.Message("In daylight the Moon Crown fragment looks like a dull piece of tarnished metal, with a tiny crescent scratched into it."),
+            SequenceRunner.Step.Message("Mia looks from the metal to you. “...Did you put that there?”"),
+            SequenceRunner.Step.Message("“No.” Mia shakes her head. “Me neither.” From the house, someone calls that lunch is ready."),
+            SequenceRunner.Step.Message("Mia backs toward the gate. “I have to go. Tomorrow?”"),
+            SequenceRunner.Step.Message("“Definitely.”"),
+            SequenceRunner.Step.Action {
+                chapterOne.onMiaWentHome()
+                friend.setPosition(-200f, -200f)
+                saveGame()
+            }
+        ))
+        dialogue = sequence.message
+    }
+
+    private fun discoverCrescentMark() {
+        if (sequence.isActive || chapterOne.crescentMarkFound()) return
+        sequence.start(listOf(
+            SequenceRunner.Step.Message("Alone, you crawl back into the fort. Something catches your eye beneath the old wooden shelf."),
+            SequenceRunner.Step.Message("A tiny crescent has been scratched into the wood—the same shape as the mark on the metal fragment."),
+            SequenceRunner.Step.Message("You know every inch of this fort. That mark wasn't there this morning."),
+            SequenceRunner.Step.Action {
+                chapterOne.onCrescentMarkFound()
+                saveGame()
+            }
+        ))
+        dialogue = sequence.message
     }
 
     private fun startThemeSwitch() {
@@ -783,10 +845,16 @@ class BackyardGame(context: Context) {
                 chapterOne.onFantasyEntered()
             } else {
                 friend.setPosition(470f, 250f)
-                if (chapterOne.readyToReturnHome() && !chapterOne.endingComplete()) {
+                if (chapterOne.readyToReturnHome() && !chapterOne.returnedToReality()) {
                     player.setPosition(470f, 214f)
-                    chapterOne.onReturnedHome()
-                    dialogue = "Back in the ordinary backyard, Mia laughs. “Tomorrow, let's make it even bigger.”"
+                    chapterOne.onReturnedToReality()
+                    saveGame()
+                    sequence.start(listOf(
+                        SequenceRunner.Step.Message("The purple towers are boards again. Sir Mia's shield is cardboard. The Goblin Fort is just the old shed."),
+                        SequenceRunner.Step.Message("But when you reach into your pocket, the crown fragment is still there."),
+                        SequenceRunner.Step.Message("It isn't shining anymore—just a strange piece of tarnished metal with a crescent scratched into it.")
+                    ))
+                    dialogue = sequence.message
                 }
             }
             eventBus.post(GameEvent.ThemeChanged(theme.name))
@@ -803,11 +871,20 @@ class BackyardGame(context: Context) {
             drawGround(canvas)
             particles.forEach { it.draw(canvas) }
             landmarks.forEach { it.draw(canvas) }
+            if (theme == ImaginationTheme.REAL && chapterOne.miaWentHome() && !chapterOne.crescentMarkFound()) {
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = 2f
+                paint.color = 0xFFB8A77A.toInt()
+                canvas.drawCircle(472f, 150f, 7f, paint)
+                paint.color = 0xFF80552E.toInt()
+                canvas.drawCircle(475f, 148f, 7f, paint)
+                paint.style = Paint.Style.FILL
+            }
             chest.draw(canvas, paint)
             if (theme == ImaginationTheme.FANTASY) moonGate.draw(canvas, paint)
             if (theme == ImaginationTheme.FANTASY && chapterOne.sigilFound()) fortEntrance.draw(canvas, paint)
             pickups.filter { it.id != "moon_sigil_pickup" || (theme == ImaginationTheme.FANTASY && chapterOne.gateUnlocked()) }.forEach { it.draw(canvas, paint) }
-            friend.draw(canvas)
+            if (!chapterOne.miaWentHome()) friend.draw(canvas)
             if (theme == ImaginationTheme.FANTASY) enemies.forEach { it.draw(canvas) }
         } else {
             drawDungeon(canvas)
@@ -947,7 +1024,10 @@ class BackyardGame(context: Context) {
                 theme == ImaginationTheme.REAL && !chapterOne.canBeginFantasy() -> "INTERACT: CHECK FORT"
                 theme == ImaginationTheme.REAL && !chapterOne.hasEnteredFantasy() -> "INTERACT: ENTER WITH MIA"
                 theme == ImaginationTheme.FANTASY && chapterOne.readyToReturnHome() &&
-                    !chapterOne.endingComplete() -> "INTERACT: RETURN WITH MIA"
+                    !chapterOne.returnedToReality() -> "INTERACT: RETURN WITH MIA"
+                theme == ImaginationTheme.REAL && chapterOne.miaWentHome() &&
+                    !chapterOne.crescentMarkFound() -> "INTERACT: CHECK FORT"
+                chapterOne.endingComplete() -> "INTERACT: CHECK MARK"
                 else -> "INTERACT: SWITCH WORLD"
             }
             nearbyInteractable is TreasureChest || nearbyInteractable is DungeonReward -> "INTERACT: OPEN"
