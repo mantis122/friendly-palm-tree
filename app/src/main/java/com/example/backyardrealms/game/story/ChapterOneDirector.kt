@@ -2,6 +2,7 @@ package com.example.backyardrealms.game.story
 
 import com.example.backyardrealms.engine.quest.QuestFlags
 import com.example.backyardrealms.game.theme.ImaginationTheme
+import com.example.backyardrealms.game.world.RoomId
 
 /** Game-specific direction for Chapter 1. */
 class ChapterOneDirector(private val flags: QuestFlags) {
