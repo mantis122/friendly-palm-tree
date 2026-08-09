@@ -601,10 +601,47 @@ class BackyardGame(context: Context) {
             }
             RoomId.GOBLIN_FORT_BOSS -> {
                 val bossActive = blanketKing.active
-                friend.updateCompanion(dt, player.centerX, player.centerY, vx, vy, player.facingDirection().first, player.facingDirection().second, player.isAttacking, bossActive, obstacles, worldBounds)
                 blanketKing.update(dt, player.centerX, player.centerY, obstacles, worldBounds)
-                if (blanketKing.needsShieldBreak && friend.tryShieldBash(blanketKing.centerX, blanketKing.centerY)) {
-                    if (blanketKing.shieldBash()) dialogue = "Sir Mia slams the cardboard shield into the Blanket King. The quilt slips—now!"
+
+                if (blanketKing.needsShieldBreak) {
+                    // During the blanket-shield phase Mia must actively move into
+                    // shield-bash range. Normal companion following keeps her near
+                    // the player and can otherwise leave the boss permanently
+                    // shielded if he stops outside her bash radius.
+                    val awayX = friend.centerX - blanketKing.centerX
+                    val awayY = friend.centerY - blanketKing.centerY
+                    val awayLength = sqrt(awayX * awayX + awayY * awayY).coerceAtLeast(0.001f)
+                    val bashStandOff = 34f
+                    val bashTargetX = blanketKing.centerX + awayX / awayLength * bashStandOff
+                    val bashTargetY = blanketKing.centerY + awayY / awayLength * bashStandOff
+
+                    friend.updateScriptedPosition(
+                        dt,
+                        bashTargetX,
+                        bashTargetY,
+                        obstacles,
+                        worldBounds
+                    )
+
+                    if (friend.tryShieldBash(blanketKing.centerX, blanketKing.centerY)) {
+                        if (blanketKing.shieldBash()) {
+                            dialogue = "Sir Mia charges in and slams her cardboard shield into the Blanket King. The quilt slips—attack now!"
+                        }
+                    }
+                } else {
+                    friend.updateCompanion(
+                        dt,
+                        player.centerX,
+                        player.centerY,
+                        vx,
+                        vy,
+                        player.facingDirection().first,
+                        player.facingDirection().second,
+                        player.isAttacking,
+                        bossActive,
+                        obstacles,
+                        worldBounds
+                    )
                 }
                 if (player.isAttacking && blanketKing.active && RectF.intersects(player.attackBounds(), blanketKing.hurtBounds)) {
                     val kb = player.attackKnockback()
