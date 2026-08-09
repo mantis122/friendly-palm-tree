@@ -91,6 +91,7 @@ class BackyardGame(context: Context) {
     private val fortEntrance = RoomPortal("goblin_fort_entrance", RectF(760f, 202f, 808f, 232f), "ENTER", "The Goblin Fort doorway is made from two old porch cushions.")
     private val dungeonExit = RoomPortal("goblin_fort_exit", RectF(64f, 236f, 92f, 300f), "EXIT", "A strip of daylight leads back to the Moon Kingdom.")
     private val treasurePassage = RoomPortal("treasure_passage", RectF(876f, 226f, 914f, 306f), "PASSAGE", "The blanket passage leads deeper into the fort.")
+    private val treasureReturn = RoomPortal("treasure_return", RectF(52f, 226f, 90f, 306f), "RETURN", "The blanket doorway leads back to the first room.")
     private val entryPlayerSwitch = FloorSwitch("moon_switch", RectF(400f, 290f, 438f, 310f))
     private val entryMiaSwitch = FloorSwitch("sun_switch", RectF(510f, 290f, 548f, 310f))
     private val entryDoor = PuzzleDoor("double_switch_door", RectF(696f, 184f, 724f, 356f))
@@ -136,7 +137,7 @@ class BackyardGame(context: Context) {
     private fun activeInteractables(): List<Interactable> = when (currentRoom) {
         RoomId.BACKYARD -> landmarks + friend + chest + moonGate + if (theme == ImaginationTheme.FANTASY && chapterOne.sigilFound()) listOf(fortEntrance) else emptyList()
         RoomId.GOBLIN_FORT_ENTRY -> listOf(friend, dungeonExit) + if (entryDoor.open) listOf(treasurePassage) else emptyList()
-        RoomId.GOBLIN_FORT_TREASURE -> listOf(friend, treasurePassage, dungeonReward) + if (dungeonReward.claimed) listOf(bossEntrance) else emptyList()
+        RoomId.GOBLIN_FORT_TREASURE -> listOf(friend, treasureReturn, dungeonReward) + if (dungeonReward.claimed) listOf(bossEntrance) else emptyList()
         RoomId.GOBLIN_FORT_BOSS -> listOf(friend) +
             (if (!blanketKing.active) listOf(crownFragment) else emptyList()) +
             (if (crownFragment.claimed) listOf(bossExit) else emptyList())
@@ -517,10 +518,8 @@ class BackyardGame(context: Context) {
         when (portal.id) {
             "goblin_fort_entrance" -> enterRoom(RoomId.GOBLIN_FORT_ENTRY, 118f, 260f, 146f, 286f)
             "goblin_fort_exit" -> enterRoom(RoomId.BACKYARD, 770f, 238f, 742f, 260f)
-            "treasure_passage" -> {
-                if (currentRoom == RoomId.GOBLIN_FORT_ENTRY) enterRoom(RoomId.GOBLIN_FORT_TREASURE, 112f, 260f, 144f, 286f)
-                else enterRoom(RoomId.GOBLIN_FORT_ENTRY, 838f, 260f, 806f, 286f)
-            }
+            "treasure_passage" -> enterRoom(RoomId.GOBLIN_FORT_TREASURE, 112f, 260f, 144f, 286f)
+            "treasure_return" -> enterRoom(RoomId.GOBLIN_FORT_ENTRY, 838f, 260f, 806f, 286f)
             "blanket_throne_entrance" -> enterRoom(RoomId.GOBLIN_FORT_BOSS, 112f, 260f, 144f, 286f)
             "blanket_throne_exit" -> enterRoom(RoomId.GOBLIN_FORT_TREASURE, 790f, 260f, 756f, 286f)
         }
