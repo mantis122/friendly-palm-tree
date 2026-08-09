@@ -65,23 +65,37 @@ class ChapterOneDirector(private val flags: QuestFlags) {
     fun miaDialogue(theme: ImaginationTheme): String {
         if (theme == ImaginationTheme.FANTASY) {
             return when {
-                flags.has(CHAPTER_COMPLETE) ->
-                    "We did it. Let's take the Moon Sigil back to Moonkeep, then crawl home."
-                flags.has(MOON_SIGIL_FOUND) -> {
-                    flags.set(CHAPTER_COMPLETE)
-                    showBanner("MOON SIGIL RESTORED", "Return to Moonkeep together", 3.4f)
-                    "You found it! Come on—let's carry it back to Moonkeep together."
-                }
+                flags.has(CROWN_FRAGMENT_CLAIMED) ->
+                    "That crown piece still gives me the creeps. Let's get back to Moonkeep and figure out what it means."
+
+                flags.has(BLANKET_KING_DEFEATED) && !flags.has(CROWN_FRAGMENT_CLAIMED) ->
+                    "Wait—look by the broken crown! Something silver fell out. That wasn't there before."
+
+                flags.has(DUNGEON_REWARD_CLAIMED) && !flags.has(BOSS_CHAMBER_ENTERED) ->
+                    "The toy box moved when we opened it. There's a passage behind the blanket wall—come on."
+
+                flags.has(GOBLIN_SCOUT_DEFEATED) && !flags.has(DUNGEON_REWARD_CLAIMED) ->
+                    "Nice! The Goblin Scout is down. Let's see what he was guarding in that toy box."
+
+                flags.has(GOBLIN_FORT_ENTERED) && !flags.has(DUNGEON_DOOR_OPEN) ->
+                    "Two switches. I'll take the sun one—you stand on the moon one."
+
+                flags.has(MOON_SIGIL_FOUND) && !flags.has(GOBLIN_FORT_ENTERED) ->
+                    "We got the Sigil back... but those goblins came from the fort. We should see what they're hiding in there."
+
                 flags.has(DEFEATED_MOON_BLOB) && !flags.has(SIGIL_QUEST_ACCEPTED) -> {
                     flags.set(FIRST_TRIAL_COMPLETE)
                     flags.set(SIGIL_QUEST_ACCEPTED)
                     showBanner("THE STOLEN SIGIL", "Search beyond the Goblin Fort", 3.0f)
                     "Nice swing! But while we were fighting, the Moon Goblins stole our silver sigil. That little brass key should open their gate."
                 }
+
                 flags.has(SIGIL_QUEST_ACCEPTED) && !flags.has(GATE_UNLOCKED) ->
                     "The Moon Gate is beside the Goblin Fort. I'll stay close—find the key and we'll go together."
+
                 flags.has(GATE_UNLOCKED) && !flags.has(MOON_SIGIL_FOUND) ->
                     "The gate is open. Keep your stick ready; I'll cover you with my shield."
+
                 else ->
                     "Look out! That Moon Blob is coming this way. I'll keep it off you—use your stick!"
             }
@@ -149,7 +163,7 @@ class ChapterOneDirector(private val flags: QuestFlags) {
 
     fun onSigilFound() {
         flags.set(MOON_SIGIL_FOUND)
-        showBanner("MOON SIGIL FOUND", "Return to Sir Mia", 2.4f)
+        showBanner("MOON SIGIL FOUND", "Investigate the Goblin Fort with Mia", 2.8f)
     }
 
     fun readyToReturnHome(): Boolean = flags.has(CHAPTER_COMPLETE) && flags.has(CROWN_FRAGMENT_CLAIMED)
@@ -174,6 +188,45 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         if (!flags.has(GATE_UNLOCKED) || flags.has(SIGIL_REACTION)) return null
         flags.set(SIGIL_REACTION)
         return "Sir Mia points past the Goblin Fort. “There! The Moon Sigil is shining behind them.”"
+    }
+
+    /**
+     * Companion dialogue inside the Goblin Fort is resolved by the most
+     * immediate unfinished event first. This prevents Mia from repeating
+     * stale combat or quest advice after the world state has changed.
+     */
+    fun miaDungeonDialogue(room: RoomId, blanketShieldUp: Boolean): String = when {
+        flags.has(CROWN_FRAGMENT_CLAIMED) ->
+            "Sir Mia turns the silver shard over in her hand. “Back to Moonkeep. I want another look at this in daylight.”"
+
+        flags.has(BLANKET_KING_DEFEATED) && !flags.has(CROWN_FRAGMENT_CLAIMED) ->
+            "Sir Mia points at the floor by the broken crown. “There! That silver piece fell out when he collapsed.”"
+
+        room == RoomId.GOBLIN_FORT_BOSS && blanketShieldUp ->
+            "Sir Mia braces her cardboard shield. “Keep him near me—I can knock that blanket loose!”"
+
+        room == RoomId.GOBLIN_FORT_BOSS && !flags.has(BLANKET_KING_DEFEATED) ->
+            "Sir Mia squints at the throne. “Okay... definitely mostly blankets. Still counts as a king.”"
+
+        flags.has(DUNGEON_REWARD_CLAIMED) && !flags.has(BOSS_CHAMBER_ENTERED) ->
+            "Sir Mia points behind the royal toy box. “That blanket wall moved. There's something back there.”"
+
+        room == RoomId.GOBLIN_FORT_TREASURE &&
+            flags.has(GOBLIN_SCOUT_DEFEATED) &&
+            !flags.has(DUNGEON_REWARD_CLAIMED) ->
+            "Sir Mia taps the royal toy box. “He was guarding this pretty hard. Open it.”"
+
+        room == RoomId.GOBLIN_FORT_TREASURE && !flags.has(GOBLIN_SCOUT_DEFEATED) ->
+            "Sir Mia lowers her voice. “There's the fort captain. Let's get past him together.”"
+
+        room == RoomId.GOBLIN_FORT_ENTRY && !flags.has(DUNGEON_DOOR_OPEN) ->
+            "Sir Mia points at the painted switches. “I'll hold the sun. You take the moon.”"
+
+        room == RoomId.GOBLIN_FORT_ENTRY ->
+            "Sir Mia grins at the open passage. “That worked! Come on—the goblins went this way.”"
+
+        else ->
+            "Sir Mia stays close. “Keep going. We're not leaving until we know what they were hiding.”"
     }
 
     fun questAccepted(): Boolean = flags.has(SIGIL_QUEST_ACCEPTED)
@@ -226,6 +279,7 @@ class ChapterOneDirector(private val flags: QuestFlags) {
     fun onCrownFragmentClaimed() {
         if (!flags.has(CROWN_FRAGMENT_CLAIMED)) {
             flags.set(CROWN_FRAGMENT_CLAIMED)
+            flags.set(CHAPTER_COMPLETE)
             showBanner("MOON CROWN FRAGMENT", "The first piece of a much larger mystery", 3.6f)
         }
     }

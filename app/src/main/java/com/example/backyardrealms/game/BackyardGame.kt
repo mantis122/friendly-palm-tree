@@ -157,6 +157,14 @@ class BackyardGame(context: Context) {
             questFlags.clear(ChapterOneDirector.CHAPTER_COMPLETE)
             questFlags.set(ChapterOneDirector.FIRST_TRIAL_COMPLETE)
         }
+        // Milestone 5.1 migration: older builds marked the chapter complete
+        // as soon as the Moon Sigil was shown to Mia. The chapter now remains
+        // active through the Goblin Fort and Blanket King encounter.
+        if (questFlags.has(ChapterOneDirector.CHAPTER_COMPLETE) &&
+            questFlags.has(ChapterOneDirector.MOON_SIGIL_FOUND) &&
+            !questFlags.has(ChapterOneDirector.CROWN_FRAGMENT_CLAIMED)) {
+            questFlags.clear(ChapterOneDirector.CHAPTER_COMPLETE)
+        }
         val freshChapter = chapterOne.initializeFreshChapter()
         if (freshChapter) {
             currentRoom = RoomId.BACKYARD
@@ -556,12 +564,10 @@ class BackyardGame(context: Context) {
             input.interactPressed && nearbyInteractable is DungeonReward -> claimDungeonReward()
             input.interactPressed && nearbyInteractable is CrownFragmentReward -> claimCrownFragment()
             input.interactPressed && nearbyInteractable is FriendNpc -> {
-                dialogue = when (currentRoom) {
-                    RoomId.GOBLIN_FORT_ENTRY -> "Sir Mia whispers, ‘These walls are definitely not blankets. Definitely.’"
-                    RoomId.GOBLIN_FORT_TREASURE -> "Sir Mia points behind the toy box. ‘That blanket wall wasn't open before.’"
-                    RoomId.GOBLIN_FORT_BOSS -> if (blanketKing.needsShieldBreak) "Sir Mia braces her cardboard shield. ‘Keep him near me—I can knock that blanket loose!’" else "Sir Mia raises her shield. ‘The Blanket King is mostly chairs. Probably.’"
-                    else -> "Mia stays close."
-                }
+                dialogue = chapterOne.miaDungeonDialogue(
+                    room = currentRoom,
+                    blanketShieldUp = currentRoom == RoomId.GOBLIN_FORT_BOSS && blanketKing.needsShieldBreak
+                )
             }
             else -> updateDungeonGameplay(dt, input)
         }
