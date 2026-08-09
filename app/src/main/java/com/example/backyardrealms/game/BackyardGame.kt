@@ -144,6 +144,7 @@ class BackyardGame(context: Context) {
     }
     private var dialogue: String? = null
     private var nearbyInteractable: Interactable? = null
+    private var portalInteractionLocked: Boolean = false
     private var showDebug = true
 
     init {
@@ -240,6 +241,8 @@ class BackyardGame(context: Context) {
         }
         if (transition.isActive) return
 
+        updatePortalInteractionLock()
+
         if (currentRoom != RoomId.BACKYARD) {
             updateDungeon(dt, input)
             camera.follow(player.centerX, player.centerY, worldBounds, dt)
@@ -261,7 +264,8 @@ class BackyardGame(context: Context) {
             }
             input.interactPressed && nearbyInteractable is TreasureChest -> openChest(nearbyInteractable as TreasureChest)
             input.interactPressed && nearbyInteractable is MoonGate -> interactWithGate()
-            input.interactPressed && nearbyInteractable is RoomPortal -> interactWithPortal(nearbyInteractable as RoomPortal)
+            input.interactPressed && nearbyInteractable is RoomPortal && !portalInteractionLocked ->
+                interactWithPortal(nearbyInteractable as RoomPortal)
             input.interactPressed && nearbyInteractable is DungeonReward -> claimDungeonReward()
             input.interactPressed && nearbyInteractable is Landmark && (nearbyInteractable as Landmark).id == "fort" -> {
                 when {
@@ -516,12 +520,12 @@ class BackyardGame(context: Context) {
 
     private fun interactWithPortal(portal: RoomPortal) {
         when (portal.id) {
-            "goblin_fort_entrance" -> enterRoom(RoomId.GOBLIN_FORT_ENTRY, 118f, 260f, 146f, 286f)
-            "goblin_fort_exit" -> enterRoom(RoomId.BACKYARD, 770f, 238f, 742f, 260f)
-            "treasure_passage" -> enterRoom(RoomId.GOBLIN_FORT_TREASURE, 112f, 260f, 144f, 286f)
-            "treasure_return" -> enterRoom(RoomId.GOBLIN_FORT_ENTRY, 838f, 260f, 806f, 286f)
-            "blanket_throne_entrance" -> enterRoom(RoomId.GOBLIN_FORT_BOSS, 112f, 260f, 144f, 286f)
-            "blanket_throne_exit" -> enterRoom(RoomId.GOBLIN_FORT_TREASURE, 790f, 260f, 756f, 286f)
+            "goblin_fort_entrance" -> enterRoom(RoomId.GOBLIN_FORT_ENTRY, 150f, 260f, 180f, 286f)
+            "goblin_fort_exit" -> enterRoom(RoomId.BACKYARD, 720f, 272f, 690f, 292f)
+            "treasure_passage" -> enterRoom(RoomId.GOBLIN_FORT_TREASURE, 150f, 260f, 182f, 286f)
+            "treasure_return" -> enterRoom(RoomId.GOBLIN_FORT_ENTRY, 810f, 260f, 780f, 286f)
+            "blanket_throne_entrance" -> enterRoom(RoomId.GOBLIN_FORT_BOSS, 150f, 260f, 182f, 286f)
+            "blanket_throne_exit" -> enterRoom(RoomId.GOBLIN_FORT_TREASURE, 790f, 340f, 756f, 366f)
         }
     }
 
@@ -529,6 +533,7 @@ class BackyardGame(context: Context) {
         if (transition.isActive) return
         transition.start {
             currentRoom = room
+            portalInteractionLocked = true
             player.setPosition(playerX, playerY)
             friend.setPosition(miaX, miaY)
             camera.reset()
@@ -546,7 +551,8 @@ class BackyardGame(context: Context) {
         nearbyInteractable = findNearestInteractable()
         when {
             input.interactPressed && dialogue != null -> dialogue = null
-            input.interactPressed && nearbyInteractable is RoomPortal -> interactWithPortal(nearbyInteractable as RoomPortal)
+            input.interactPressed && nearbyInteractable is RoomPortal && !portalInteractionLocked ->
+                interactWithPortal(nearbyInteractable as RoomPortal)
             input.interactPressed && nearbyInteractable is DungeonReward -> claimDungeonReward()
             input.interactPressed && nearbyInteractable is CrownFragmentReward -> claimCrownFragment()
             input.interactPressed && nearbyInteractable is FriendNpc -> {
@@ -723,7 +729,7 @@ class BackyardGame(context: Context) {
                 if (entryDoor.open) treasurePassage.draw(canvas, paint)
             }
             RoomId.GOBLIN_FORT_TREASURE -> {
-                treasurePassage.draw(canvas, paint); dungeonReward.draw(canvas, paint); goblinScout.draw(canvas)
+                treasureReturn.draw(canvas, paint); dungeonReward.draw(canvas, paint); goblinScout.draw(canvas)
                 if (dungeonReward.claimed) bossEntrance.draw(canvas, paint)
             }
             RoomId.GOBLIN_FORT_BOSS -> {
@@ -837,6 +843,24 @@ class BackyardGame(context: Context) {
                     }
                 )
             )
+    }
+
+    /**
+     * Room transitions temporarily lock portal interaction. The lock is only
+     * released after the player has physically left every active portal's
+     * interaction zone, preventing an arrival doorway from immediately sending
+     * the player back where they came from.
+     */
+    private fun updatePortalInteractionLock() {
+        if (!portalInteractionLocked) return
+
+        val touchingPortal = activeInteractables()
+            .filterIsInstance<RoomPortal>()
+            .any { RectF.intersects(player.collisionBounds, it.interactionBounds) }
+
+        if (!touchingPortal) {
+            portalInteractionLocked = false
+        }
     }
 
     /**
