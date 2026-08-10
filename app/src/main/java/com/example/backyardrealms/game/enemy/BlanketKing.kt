@@ -56,7 +56,7 @@ class BlanketKing(
             if (vulnerableTimer <= 0f && health.current > 3) phase = BlanketKingPhase.SHIELDED
             return
         }
-        if (phase == BlanketKingPhase.SHIELDED || hurtTimer > 0f) {
+        if (hurtTimer > 0f) {
             vx *= .82f; vy *= .82f
             return
         }
@@ -65,12 +65,25 @@ class BlanketKing(
         val dy = playerY - centerY
         val distance = sqrt(dx * dx + dy * dy).coerceAtLeast(.001f)
         attackTimer -= dt
-        val speed = if (phase == BlanketKingPhase.FINAL) 72f else 48f
+
+        // The blanket shield blocks the player's attacks, but the boss remains
+        // active. He advances more slowly and throws pillows less often while
+        // waiting for Sir Mia to knock the blanket aside.
+        val speed = when (phase) {
+            BlanketKingPhase.FINAL -> 72f
+            BlanketKingPhase.SHIELDED -> 30f
+            else -> 48f
+        }
         vx = dx / distance * speed
         vy = dy / distance * speed
+
         if (attackTimer <= 0f) {
             throwPillows(playerX, playerY)
-            attackTimer = if (phase == BlanketKingPhase.FINAL) .8f else 1.45f
+            attackTimer = when (phase) {
+                BlanketKingPhase.FINAL -> .8f
+                BlanketKingPhase.SHIELDED -> 1.85f
+                else -> 1.45f
+            }
         }
         move(vx * dt, 0f, obstacles, bounds)
         move(0f, vy * dt, obstacles, bounds)
@@ -138,7 +151,7 @@ class BlanketKing(
         if (!active) return
         val wobble = sin(age * 5f) * 2f
         paint.color = when (phase) {
-            BlanketKingPhase.SHIELDED -> 0xFF5B4C8C.toInt()
+            BlanketKingPhase.SHIELDED -> 0xFF4A3F78.toInt()
             BlanketKingPhase.VULNERABLE -> 0xFFE4D8F6.toInt()
             BlanketKingPhase.FINAL -> 0xFF9E4F68.toInt()
             else -> if (hurtTimer > 0f) 0xFFFFE7E7.toInt() else 0xFF76538F.toInt()
@@ -158,6 +171,13 @@ class BlanketKing(
         canvas.drawCircle(body.left + 14f, body.top - 8f, 5f, paint)
         canvas.drawCircle(body.centerX(), body.top - 11f, 6f, paint)
         canvas.drawCircle(body.right - 14f, body.top - 8f, 5f, paint)
+        if (phase == BlanketKingPhase.SHIELDED) {
+            paint.color = 0xFFD8CCE8.toInt()
+            canvas.drawRect(body.left - 4f, body.top + 8f, body.right + 4f, body.bottom - 2f, paint)
+            paint.color = 0xFF6E5E8F.toInt()
+            canvas.drawRect(body.left - 6f, body.centerY() - 2f, body.right + 6f, body.centerY() + 3f, paint)
+        }
+
         paint.color = 0xCC000000.toInt()
         canvas.drawRect(body.left, body.top - 18f, body.right, body.top - 14f, paint)
         paint.color = 0xFF71D46C.toInt()
@@ -172,7 +192,11 @@ class BlanketKing(
             val base = kotlin.math.atan2(dy, dx)
             val spread = (index - (count - 1) / 2f) * .28f
             val angle = base + spread
-            val speed = if (phase == BlanketKingPhase.FINAL) 100f else 82f
+            val speed = when (phase) {
+                BlanketKingPhase.FINAL -> 100f
+                BlanketKingPhase.SHIELDED -> 70f
+                else -> 82f
+            }
             pillows += Pillow(RectF(centerX - 7f, centerY - 5f, centerX + 7f, centerY + 5f), cos(angle) * speed, sin(angle) * speed, 3.2f, attackSerial++)
         }
     }
