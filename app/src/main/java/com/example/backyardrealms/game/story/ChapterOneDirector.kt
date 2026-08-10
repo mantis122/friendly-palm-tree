@@ -12,6 +12,14 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         private set
     var bannerTimer: Float = 0f
         private set
+    var bannerDismissDelay: Float = 0f
+        private set
+
+    val bannerVisible: Boolean
+        get() = bannerTimer > 0f && bannerTitle != null
+
+    val bannerDismissible: Boolean
+        get() = bannerVisible && bannerDismissDelay <= 0f
 
     fun initializeFreshChapter(): Boolean {
         if (flags.has(CHAPTER_STARTED)) return false
@@ -22,11 +30,22 @@ class ChapterOneDirector(private val flags: QuestFlags) {
 
     fun update(dt: Float) {
         if (bannerTimer <= 0f) return
+        bannerDismissDelay = (bannerDismissDelay - dt).coerceAtLeast(0f)
         bannerTimer = (bannerTimer - dt).coerceAtLeast(0f)
-        if (bannerTimer == 0f) {
-            bannerTitle = null
-            bannerSubtitle = null
-        }
+        if (bannerTimer == 0f) clearBanner()
+    }
+
+    fun dismissBanner(): Boolean {
+        if (!bannerDismissible) return false
+        clearBanner()
+        return true
+    }
+
+    private fun clearBanner() {
+        bannerTimer = 0f
+        bannerDismissDelay = 0f
+        bannerTitle = null
+        bannerSubtitle = null
     }
 
     fun objective(theme: ImaginationTheme): String = when {
@@ -350,9 +369,11 @@ class ChapterOneDirector(private val flags: QuestFlags) {
         bannerTitle = title
         bannerSubtitle = subtitle
         bannerTimer = duration
+        bannerDismissDelay = BANNER_INPUT_DELAY_SECONDS
     }
 
     companion object {
+        private const val BANNER_INPUT_DELAY_SECONDS = 0.7f
         const val CHAPTER_STARTED = "CH1_STARTED"
         const val TALKED_TO_MIA = "CH1_TALKED_TO_MIA"
         const val FOUND_STICK = "CH1_FOUND_STICK"

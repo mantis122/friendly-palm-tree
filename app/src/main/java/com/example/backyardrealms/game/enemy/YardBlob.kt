@@ -29,7 +29,6 @@ class YardBlob(
     private var age = 0f
     private var wanderTimer = 0f
     private var hurtTimer = 0f
-    private var defeatedTimer = 0f
     private var stunTimer = 0f
     private var lastAttackId = -1
     var state: EnemyState = EnemyState.WANDER
@@ -41,11 +40,7 @@ class YardBlob(
 
     fun update(dt: Float, playerX: Float, playerY: Float, obstacles: List<RectF>, worldBounds: RectF) {
         age += dt
-        if (state == EnemyState.DEFEATED) {
-            defeatedTimer -= dt
-            if (defeatedTimer <= 0f) respawn()
-            return
-        }
+        if (state == EnemyState.DEFEATED) return
         if (stunTimer > 0f) {
             stunTimer = (stunTimer - dt).coerceAtLeast(0f)
             state = EnemyState.STUNNED
@@ -99,12 +94,23 @@ class YardBlob(
         if (!health.isAlive) {
             state = EnemyState.DEFEATED
             active = false
-            defeatedTimer = RESPAWN_SECONDS
         }
         return true
     }
 
+    /** Explicit reset/debug respawn. Story gameplay never respawns a defeated blob automatically. */
     fun forceRespawn() = respawn()
+
+    /** Restore a defeated state from persistent story/save flags. */
+    fun markDefeated() {
+        health.damage(health.maximum)
+        active = false
+        state = EnemyState.DEFEATED
+        hurtTimer = 0f
+        stunTimer = 0f
+        velocityX = 0f
+        velocityY = 0f
+    }
 
     /** Companion support action: stun without dealing damage. */
     fun stun(seconds: Float = 0.75f): Boolean {
@@ -122,7 +128,6 @@ class YardBlob(
         active = true
         state = EnemyState.WANDER
         hurtTimer = 0f
-        defeatedTimer = 0f
         stunTimer = 0f
         velocityX = 0f
         velocityY = 0f
@@ -172,6 +177,5 @@ class YardBlob(
         private const val NOTICE_DISTANCE = 120f
         private const val WANDER_SPEED = 24f
         private const val CHASE_SPEED = 46f
-        private const val RESPAWN_SECONDS = 4f
     }
 }

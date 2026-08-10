@@ -185,6 +185,9 @@ class BackyardGame(context: Context) {
         crownFragment.claimed = chapterOne.crownFragmentClaimed()
         if (chapterOne.goblinScoutDefeated()) goblinScout.receiveHit(DamageHit("load", 999, 0f, 0f, 999999))
         if (chapterOne.blanketKingDefeated()) blanketKing.markDefeated()
+        enemies.forEach { enemy ->
+            if (questFlags.has(blobDefeatedFlag(enemy.id))) enemy.markDefeated()
+        }
         pickups.firstOrNull { it.id == "moon_sigil_pickup" }?.collected = chapterOne.sigilFound()
         if (freshChapter) {
             inventory.remove("stick", inventory.quantity("stick"))
@@ -213,13 +216,8 @@ class BackyardGame(context: Context) {
 
     fun update(dt: Float, input: InputSnapshot) {
         transition.update(dt)
-        chapterOne.update(dt)
-        friend.update(dt)
-        particles.forEach { it.update(dt) }
-        pickups.forEach { it.update(dt) }
-        saveTimer += dt
-        if (saveTimer >= 5f) { saveGame(); saveTimer = 0f }
 
+        // Scripted dialogue is fully modal. Nothing in the live world advances.
         if (sequence.isActive) {
             dialogue = sequence.message
             if (input.interactPressed) {
@@ -229,6 +227,33 @@ class BackyardGame(context: Context) {
             camera.follow(player.centerX, player.centerY, worldBounds, dt)
             return
         }
+
+        // Banners pause gameplay, but their own timer keeps advancing.
+        chapterOne.update(dt)
+        if (chapterOne.bannerVisible) {
+            if (input.interactPressed) chapterOne.dismissBanner()
+            camera.follow(player.centerX, player.centerY, worldBounds, dt)
+            return
+        }
+
+        // Ordinary dialogue pauses player movement, AI, damage, pickups and ambience.
+        if (dialogue != null) {
+            if (input.interactPressed) {
+                dialogue = null
+                if (firstTransformationPending) {
+                    firstTransformationPending = false
+                    startThemeSwitch()
+                }
+            }
+            camera.follow(player.centerX, player.centerY, worldBounds, dt)
+            return
+        }
+
+        friend.update(dt)
+        particles.forEach { it.update(dt) }
+        pickups.forEach { it.update(dt) }
+        saveTimer += dt
+        if (saveTimer >= 5f) { saveGame(); saveTimer = 0f }
 
         if (input.developerPressed) {
             developerOpen = !developerOpen
@@ -318,7 +343,14 @@ class BackyardGame(context: Context) {
     private fun updateDeveloper(input: InputSnapshot) {
         if (input.interactPressed) startThemeSwitch()
         if (kotlin.math.abs(input.moveY) > 0.7f && !verticalInputLatched) {
-            if (input.moveY < 0f) worldTime = worldTime.next() else enemies.forEach { it.forceRespawn() }
+            if (input.moveY < 0f) {
+                worldTime = worldTime.next()
+            } else {
+                enemies.forEach {
+                    questFlags.clear(blobDefeatedFlag(it.id))
+                    it.forceRespawn()
+                }
+            }
             verticalInputLatched = true
             saveGame()
         }
@@ -385,6 +417,8 @@ class BackyardGame(context: Context) {
             }
         }
 
+        if (dialogue != null || chapterOne.bannerVisible) return
+
         enemies.forEach { enemy ->
             enemy.update(dt, player.centerX, player.centerY, obstacles, worldBounds)
             if (enemy.active && friend.tryShieldBash(enemy.centerX, enemy.centerY)) {
@@ -399,8 +433,10 @@ class BackyardGame(context: Context) {
                     eventBus.post(GameEvent.DamageDealt("player", enemy.id, 1))
                     if (wasAlive && !enemy.health.isAlive) {
                         eventBus.post(GameEvent.EntityDefeated(enemy.id))
+                        questFlags.set(blobDefeatedFlag(enemy.id))
                         chapterOne.onMoonBlobDefeated(enemy.id)
                         saveGame()
+                        if (chapterOne.bannerVisible || dialogue != null) return
                     }
                 }
             }
@@ -513,6 +549,10 @@ class BackyardGame(context: Context) {
         entryDoor.open = false
         dungeonReward.claimed = false
         goblinScout.restore()
+        enemies.forEach {
+            questFlags.clear(blobDefeatedFlag(it.id))
+            it.forceRespawn()
+        }
         player.setPosition(470f, 214f)
         friend.setPosition(470f, 250f)
         firstTransformationPending = false
@@ -540,6 +580,8 @@ class BackyardGame(context: Context) {
         dialogue = "You tumble back to Moonkeep and catch your breath."
         saveGame()
     }
+
+    private fun blobDefeatedFlag(enemyId: String): String = "CH1_BLOB_DEFEATED_$enemyId"
 
     private fun saveGame() = saveManager.save(GameSave(
         player.x, player.y, theme, worldTime,
@@ -618,6 +660,7 @@ class BackyardGame(context: Context) {
                     chapterOne.onDungeonDoorOpened()
                     dialogue = "Both painted switches sink into the floor. The blanket gate slides aside!"
                     saveGame()
+                    return
                 }
             }
             RoomId.GOBLIN_FORT_TREASURE -> {
@@ -628,6 +671,7 @@ class BackyardGame(context: Context) {
                     val alive = goblinScout.health.isAlive
                     if (goblinScout.receiveHit(DamageHit("player", itemCatalog["stick"]?.damage ?: 1, kb.first, kb.second, player.currentAttackId)) && alive && !goblinScout.health.isAlive) {
                         chapterOne.onGoblinScoutDefeated(); saveGame()
+                        return
                     }
                 }
                 if (goblinScout.active && RectF.intersects(player.hurtBounds, goblinScout.contactBounds)) {
@@ -661,6 +705,7 @@ class BackyardGame(context: Context) {
                     if (friend.tryShieldBash(blanketKing.centerX, blanketKing.centerY)) {
                         if (blanketKing.shieldBash()) {
                             dialogue = "Sir Mia charges in and slams her cardboard shield into the Blanket King. The quilt slips—attack now!"
+                            return
                         }
                     }
                 } else {
@@ -683,6 +728,7 @@ class BackyardGame(context: Context) {
                     val alive = blanketKing.health.isAlive
                     if (blanketKing.receiveHit(DamageHit("player", itemCatalog["stick"]?.damage ?: 1, kb.first, kb.second, player.currentAttackId)) && alive && !blanketKing.health.isAlive) {
                         chapterOne.onBlanketKingDefeated(); saveGame()
+                        return
                     }
                 }
                 if (blanketKing.active && RectF.intersects(player.hurtBounds, blanketKing.contactBounds)) {
@@ -993,30 +1039,56 @@ class BackyardGame(context: Context) {
     }
 
     private fun drawObjectiveHud(canvas: Canvas) {
-        if (developerOpen || inventoryOpen || chapterOne.bannerTimer > 0f) return
+        if (developerOpen || inventoryOpen || chapterOne.bannerVisible || dialogue != null || sequence.isActive) return
         paint.color = 0xC9141414.toInt()
-        canvas.drawRoundRect(108f, 82f, 372f, 108f, 6f, 6f, paint)
+        canvas.drawRoundRect(116f, 76f, 364f, 112f, 6f, 6f, paint)
         paint.color = 0xFFFFE9A8.toInt()
         paint.textAlign = Paint.Align.CENTER
         paint.textSize = 8.5f
-        canvas.drawText("OBJECTIVE: ${chapterOne.objective(theme)}", 240f, 99f, paint)
+        val lines = wrapTextToWidth("OBJECTIVE: ${chapterOne.objective(theme)}", 228f)
+        lines.take(2).forEachIndexed { index, line ->
+            canvas.drawText(line, 240f, 91f + index * 11f, paint)
+        }
     }
 
     private fun drawStoryBanner(canvas: Canvas) {
         val title = chapterOne.bannerTitle ?: return
-        paint.color = 0xD9000000.toInt()
-        canvas.drawRect(0f, 88f, GameConfig.LOGICAL_WIDTH, 178f, paint)
-        paint.color = 0xFFFFFFFF.toInt()
+
+        // Central safe column stays clear of joystick and right-side buttons.
+        val left = 120f
+        val right = 340f
+        val top = 78f
+        val bottom = 188f
+        paint.color = 0xEE000000.toInt()
+        canvas.drawRoundRect(left, top, right, bottom, 8f, 8f, paint)
+
         paint.textAlign = Paint.Align.CENTER
-        paint.textSize = 23f
-        canvas.drawText(title, 240f, 125f, paint)
+        paint.color = 0xFFFFFFFF.toInt()
+        paint.textSize = 17f
+        val titleLines = wrapTextToWidth(title, right - left - 20f).take(3)
+        var y = 103f
+        titleLines.forEach { line ->
+            canvas.drawText(line, 230f, y, paint)
+            y += 19f
+        }
+
         paint.color = 0xFFFFE2A1.toInt()
-        paint.textSize = 11f
-        canvas.drawText(chapterOne.bannerSubtitle.orEmpty(), 240f, 149f, paint)
+        paint.textSize = 10.5f
+        val subtitleLines = wrapTextToWidth(chapterOne.bannerSubtitle.orEmpty(), right - left - 20f).take(2)
+        y += 3f
+        subtitleLines.forEach { line ->
+            canvas.drawText(line, 230f, y, paint)
+            y += 13f
+        }
+
+        paint.color = 0xFFBBBBBB.toInt()
+        paint.textSize = 8f
+        canvas.drawText(if (chapterOne.bannerDismissible) "INTERACT to continue" else "...", 230f, bottom - 9f, paint)
     }
 
     private fun drawPrompt(canvas: Canvas) {
-        if (dialogue != null || nearbyInteractable == null || developerOpen || inventoryOpen) return
+        if (dialogue != null || sequence.isActive || chapterOne.bannerVisible ||
+            nearbyInteractable == null || developerOpen || inventoryOpen) return
         paint.color = 0xCC000000.toInt(); canvas.drawRoundRect(170f, 222f, 310f, 250f, 6f, 6f, paint)
         paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.CENTER; paint.textSize = 11f
         val text = when {
@@ -1039,11 +1111,29 @@ class BackyardGame(context: Context) {
 
     private fun drawDialogue(canvas: Canvas) {
         val text = dialogue ?: return
-        paint.color = 0xEE171717.toInt(); canvas.drawRoundRect(28f, 184f, 452f, 256f, 8f, 8f, paint)
-        paint.color = 0xFFFFFFFF.toInt(); paint.textAlign = Paint.Align.LEFT; paint.textSize = 12f
-        canvas.drawText(text.take(68), 44f, 216f, paint)
-        if (text.length > 68) canvas.drawText(text.drop(68).take(68), 44f, 233f, paint)
-        paint.textAlign = Paint.Align.RIGHT; paint.textSize = 9f; canvas.drawText("Tap INTERACT to close", 436f, 248f, paint)
+
+        // Safe center column avoids both thumb-control zones.
+        val left = 120f
+        val right = 340f
+        val top = 112f
+        val bottom = 260f
+        val padding = 12f
+
+        paint.color = 0xF2171717.toInt()
+        canvas.drawRoundRect(left, top, right, bottom, 8f, 8f, paint)
+
+        paint.color = 0xFFFFFFFF.toInt()
+        paint.textAlign = Paint.Align.LEFT
+        paint.textSize = 10.5f
+        val lines = wrapTextToWidth(text, right - left - padding * 2f)
+        lines.take(8).forEachIndexed { index, line ->
+            canvas.drawText(line, left + padding, top + 22f + index * 14f, paint)
+        }
+
+        paint.color = 0xFFBEBEBE.toInt()
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 8f
+        canvas.drawText("INTERACT to continue", (left + right) * 0.5f, bottom - 8f, paint)
     }
 
     private fun drawWorldDebug(canvas: Canvas) {
@@ -1135,25 +1225,32 @@ class BackyardGame(context: Context) {
         canvas.drawText("BAG or ACTION: close", 240f, 239f, paint)
     }
 
-    private fun wrapText(text: String, maxCharacters: Int, maxLines: Int): List<String> {
-        if (text.isBlank()) return emptyList()
-        val words = text.trim().split(Regex("\\s+"))
-        val lines = mutableListOf<String>()
-        var current = StringBuilder()
+    /**
+     * Pixel-width, whole-word wrapping. Normal words are never cut merely
+     * because a character count boundary was reached.
+     */
+    private fun wrapTextToWidth(text: String, maxWidth: Float): List<String> {
+        val words = text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (words.isEmpty()) return listOf("")
 
+        val lines = mutableListOf<String>()
+        var current = ""
         for (word in words) {
-            val candidateLength = if (current.isEmpty()) word.length else current.length + 1 + word.length
-            if (candidateLength <= maxCharacters) {
-                if (current.isNotEmpty()) current.append(' ')
-                current.append(word)
+            val candidate = if (current.isEmpty()) word else "$current $word"
+            if (current.isEmpty() || paint.measureText(candidate) <= maxWidth) {
+                current = candidate
             } else {
-                if (current.isNotEmpty()) lines += current.toString()
-                current = StringBuilder(word)
-                if (lines.size == maxLines - 1) break
+                lines += current
+                current = word
             }
         }
-        if (lines.size < maxLines && current.isNotEmpty()) lines += current.toString()
-        return lines.take(maxLines)
+        if (current.isNotEmpty()) lines += current
+        return lines
+    }
+
+    private fun wrapText(text: String, maxCharacters: Int, maxLines: Int): List<String> {
+        val approximateWidth = paint.measureText("M".repeat(maxCharacters.coerceAtLeast(1)))
+        return wrapTextToWidth(text, approximateWidth).take(maxLines)
     }
 
     private fun drawDeveloperPanel(canvas: Canvas) {
